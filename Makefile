@@ -177,32 +177,32 @@ main.cpp.s:
 	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/main.cpp.s
 .PHONY : main.cpp.s
 
-opengl_globals.o: opengl_globals.cpp.o
+ogmain.o: ogmain.cpp.o
 
-.PHONY : opengl_globals.o
+.PHONY : ogmain.o
 
 # target to build an object file
-opengl_globals.cpp.o:
-	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/opengl_globals.cpp.o
-.PHONY : opengl_globals.cpp.o
+ogmain.cpp.o:
+	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/ogmain.cpp.o
+.PHONY : ogmain.cpp.o
 
-opengl_globals.i: opengl_globals.cpp.i
+ogmain.i: ogmain.cpp.i
 
-.PHONY : opengl_globals.i
+.PHONY : ogmain.i
 
 # target to preprocess a source file
-opengl_globals.cpp.i:
-	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/opengl_globals.cpp.i
-.PHONY : opengl_globals.cpp.i
+ogmain.cpp.i:
+	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/ogmain.cpp.i
+.PHONY : ogmain.cpp.i
 
-opengl_globals.s: opengl_globals.cpp.s
+ogmain.s: ogmain.cpp.s
 
-.PHONY : opengl_globals.s
+.PHONY : ogmain.s
 
 # target to generate assembly for a file
-opengl_globals.cpp.s:
-	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/opengl_globals.cpp.s
-.PHONY : opengl_globals.cpp.s
+ogmain.cpp.s:
+	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/ogmain.cpp.s
+.PHONY : ogmain.cpp.s
 
 shader.o: shader.cpp.o
 
@@ -273,9 +273,9 @@ help:
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
-	@echo "... opengl_globals.o"
-	@echo "... opengl_globals.i"
-	@echo "... opengl_globals.s"
+	@echo "... ogmain.o"
+	@echo "... ogmain.i"
+	@echo "... ogmain.s"
 	@echo "... shader.o"
 	@echo "... shader.i"
 	@echo "... shader.s"

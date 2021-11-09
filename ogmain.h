@@ -9,6 +9,17 @@
 #include "shader.h"
 
 
+extern void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+
+
+struct client_renderer {
+        virtual void render() = 0;
+};
+
+extern int og_main(client_renderer *renderer);
+
+
+
 
 inline auto now() noexcept { return std::chrono::high_resolution_clock::now(); }
 

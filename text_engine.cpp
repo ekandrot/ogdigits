@@ -3,16 +3,18 @@
 
 #include <vector>
 
-#include "opengl_globals.h"
 #include "math_3d.h"
 #include "image_loader.h"
 #include "text_engine.h"
+
+#include "ogmain.h"
+
+//-------------------------------------------------------------------------------------------
 
 const char *chars_in_texture = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-~`[]{}\\|;:',.<>/?";
 int char_to_index[256];
 
 static GLuint texture_obj;
-
 
 //-------------------------------------------------------------------------------------------
 

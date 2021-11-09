@@ -7,9 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 add_executable(ogdigits.app main.cpp)
 target_sources(ogdigits.app
+        PRIVATE ogmain.cpp
         PRIVATE shader.cpp
         PRIVATE image_loader.cpp
-        PRIVATE opengl_globals.cpp
         PRIVATE text_engine.cpp)
 
 cmake_policy (SET CMP0072 OLD)
