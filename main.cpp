@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <charconv>
 
 #include "math_3d.h"
 #include "opengl_globals.h"
@@ -13,8 +14,73 @@
 #include "text_engine.h"
 #include "image_loader.h"
 
+
+int number_offset{0};
+
 //-------------------------------------------------------------------------------------------
 
+const std::string train_data_filename("../data/digits/train.csv");
+const std::string test_data_filename("../data/digits/test.csv");
+const std::string submit_filename("submit.csv");
+
+//-------------------------------------------------------------------------------------------
+
+void get_all_values(const char *first, const char *last, std::vector<int> &x) {
+    int value(0);
+    auto res = std::from_chars(first, last, value);
+    while (res.ec == std::errc()) {
+        x.push_back(value);
+        res = std::from_chars(res.ptr+1, last, value);
+    }
+}
+
+void load_train_data(const std::string& fname, std::vector<int> &y, std::vector<int> &x) {
+    std::ifstream file(fname);
+
+    std::string str;
+    std::getline(file, str);
+
+    // x.reserve(32928000);
+    while (std::getline(file, str)) {
+        int value(0);
+        auto res = std::from_chars(str.c_str(), str.c_str()+str.size(), value);
+        y.push_back(value);
+        get_all_values(res.ptr+1, str.c_str()+str.size(), x);
+    }
+
+    std::cout << "Training data, targets:  " << y.size() << std::endl;
+    std::cout << "Training data, data elements:  " << x.size() << std::endl;
+    std::cout << "Training data, data elements, num of features:  " << x.size() / y.size() << std::endl;
+}
+
+void load_test_data(const std::string& fname, std::vector<int> &x) {
+    std::ifstream file(fname);
+
+    std::string str;
+    std::getline(file, str);
+
+    int element_count(0);
+    while (std::getline(file, str)) {
+        ++element_count;
+        get_all_values(str.c_str(), str.c_str()+str.size(), x);
+    }
+
+    std::cout << std::endl;
+    std::cout << "Test data, targets:  " << element_count << std::endl;
+    std::cout << "Test data, data elements:  " << x.size() << std::endl;
+    std::cout << "Test data, data elements, num of features:  " << x.size() / element_count << std::endl;
+}
+
+void write_submit(const std::string& fname, const std::vector<int> &y) {
+    std::ofstream file(fname);
+
+    file << "ImageId,Label" << std::endl;
+    for (size_t i=0; i<y.size(); ++i) {
+        file << i+1 << "," << y[i] << std::endl;
+    }
+}
+
+//------------------------------------------------------------------------------
 
 #define W_WIDTH 1024
 #define W_HEIGHT 768
@@ -186,7 +252,11 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
         // yoffset seems to be the changing value on my mouse
         // -1 squares should get bigger
         // +1 squares should get smaller
-        std::cout << "scroll_callback:  " << xoffset << ", " << yoffset << '\n';
+        // std::cout << "scroll_callback:  " << xoffset << ", " << yoffset << '\n';
+        number_offset -= yoffset;
+
+        if (number_offset < 0) number_offset = 0;
+        if (number_offset > 1000) number_offset = 1000;
 }
 
 void window_moved_callback(GLFWwindow* window, int xpos, int ypos)
@@ -296,9 +366,67 @@ void draw_cursor()
         // glBindVertexArray(0);
 }
 
-void render_scene()
+static GLuint texture_data_obj;
+void create_Data_texture(const std::vector<int> &x_train)
 {
-        render_text("Edward Kandrot", 24, 0, 0);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+        float test[28*28];
+
+        for (int i=0; i<28*28; ++i) {
+                test[i] = x_train[28*28*number_offset+i] / 255.0;
+        }
+
+        const GLsizei texture_width = 28;
+        const GLsizei texture_height = 28;
+        glGenTextures(1, &texture_data_obj);
+        glBindTexture(GL_TEXTURE_2D, texture_data_obj);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width, texture_height, 0, GL_RED, GL_FLOAT, test);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);       //GL_NEAREST
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);       //GL_NEAREST
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
+void render_data(const std::vector<int> &y_train, const std::vector<int> &x_train)
+{
+        create_Data_texture(x_train);
+
+        glBindVertexArray(square_vao);
+        texture_shader->use(0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture_data_obj);
+
+        Matrix4f mat;
+        mat *= scale_matrix(window_ratio,1,1);
+        // mat *= scale_matrix(750.0/514,1,1);
+        // mat *= translation_matrix(x, y, 0);
+        // mat *= scale_matrix(scale);
+        // mat *= translation_matrix(spacing, 0, 0);
+        // mat *= scale_matrix(ratio, 1, 1);
+        glUniformMatrix4fv(texture_shader->world_location, 1, GL_FALSE, mat.glformat());
+
+        // set the sample coords
+        GLfloat box[8] = {0,1, 1,1, 0,0, 1,0};
+        glNamedBufferSubData(texture_coord_vbo, 0, sizeof(GLfloat)*8, box);
+
+        glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, 0);
+        glBindVertexArray(0);
+
+
+        render_text("Where it's at:", 24, -1, 0.1);
+        std::string pos = std::to_string(number_offset);
+        render_text(pos.c_str(), 24, -0.75, 0.1);
+
+        render_text("What it is:", 24, -1, 0);
+        std::string num(1, (char)(y_train[number_offset] + '0'));
+        render_text(num.c_str(), 24, -0.8, 0);
+
+}
+
+void render_scene(const std::vector<int> &y_train, const std::vector<int> &x_train)
+{
+        render_data(y_train, x_train);
 
         draw_cursor();
 
@@ -412,6 +540,8 @@ void init_opengl_objects()
 
 int main()
 {
+        srand(time(NULL));
+
         unsigned int n = std::thread::hardware_concurrency();
         std::cout << n << " concurrent threads are supported.\n";
 
@@ -474,6 +604,22 @@ int main()
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
         glfwGetCursorPos(window, &xpos_prev, &ypos_prev);
 
+
+
+
+        double start_time, end_time, total_time;
+
+        std::vector<int> y_train;
+        std::vector<int> x_train;
+        start_time = glfwGetTime();
+        load_train_data(train_data_filename, y_train, x_train);
+        end_time = glfwGetTime();
+        total_time = end_time - start_time;
+        std::cout << "Total time loading training data:  " << total_time << std::endl;
+
+
+
+
 	while (!glfwWindowShouldClose(window)) {
                 double current_time = glfwGetTime();
                 double delta_time = current_time - last_time;
@@ -510,7 +656,7 @@ int main()
                         }
 
 
-                        render_scene();
+                        render_scene(y_train, x_train);
                         glfwSwapBuffers(window);
                 }
 
