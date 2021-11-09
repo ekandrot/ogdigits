@@ -379,7 +379,6 @@ void create_Data_texture(const std::vector<int> &x_train)
 
         const GLsizei texture_width = 28;
         const GLsizei texture_height = 28;
-        glGenTextures(1, &texture_data_obj);
         glBindTexture(GL_TEXTURE_2D, texture_data_obj);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width, texture_height, 0, GL_RED, GL_FLOAT, test);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);       //GL_NEAREST
@@ -398,12 +397,10 @@ void render_data(const std::vector<int> &y_train, const std::vector<int> &x_trai
         glBindTexture(GL_TEXTURE_2D, texture_data_obj);
 
         Matrix4f mat;
-        mat *= scale_matrix(window_ratio,1,1);
-        // mat *= scale_matrix(750.0/514,1,1);
-        // mat *= translation_matrix(x, y, 0);
-        // mat *= scale_matrix(scale);
-        // mat *= translation_matrix(spacing, 0, 0);
-        // mat *= scale_matrix(ratio, 1, 1);
+        mat *= translation_matrix(-1,1,0);
+        mat *= scale_matrix(width_unit_per_pixel, height_unit_per_pixel, 1);
+        mat *= translation_matrix(0,-200,0);
+        mat *= scale_matrix(200);
         glUniformMatrix4fv(texture_shader->world_location, 1, GL_FALSE, mat.glformat());
 
         // set the sample coords
@@ -414,13 +411,13 @@ void render_data(const std::vector<int> &y_train, const std::vector<int> &x_trai
         glBindVertexArray(0);
 
 
-        render_text("Where it's at:", 24, -1, 0.1);
+        float offset = render_text("Where it's at:", 24, -1, 250, PIXEL_OFFSET) + 10;
         std::string pos = std::to_string(number_offset);
-        render_text(pos.c_str(), 24, -0.75, 0.1);
+        render_text(pos.c_str(), 24, offset, 250, PIXEL_OFFSET);
 
-        render_text("What it is:", 24, -1, 0);
+        offset = render_text("What it is:", 24, -1, 0.5) + 10 * width_unit_per_pixel;
         std::string num(1, (char)(y_train[number_offset] + '0'));
-        render_text(num.c_str(), 24, -0.8, 0);
+        render_text(num.c_str(), 24, offset, 0.5);
 
 }
 
@@ -436,6 +433,10 @@ void render_scene(const std::vector<int> &y_train, const std::vector<int> &x_tra
 
 void init_opengl_objects()
 {
+        glGenTextures(1, &texture_data_obj);
+
+
+
         color_shader = new ColorShader();
         text_shader = new TextShader();
         texture_shader = new TextureShader();

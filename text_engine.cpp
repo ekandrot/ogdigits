@@ -161,8 +161,13 @@ static float render_imaged_char(unsigned int which_char, int pixels, float spaci
 
 
 //ek need to return the bounding box of the rendered text
-void render_text(const std::string str, int pixels, float x, float y)
+float render_text(const std::string str, int pixels, float x, float y, TEXT_OFFSET which)
 {
+        if (which == PIXEL_OFFSET) {
+                x *= width_unit_per_pixel;
+                y *= height_unit_per_pixel;
+        }
+
         glBindVertexArray(square_vao);
         text_shader->use(0);
         glActiveTexture(GL_TEXTURE0);
@@ -181,6 +186,10 @@ void render_text(const std::string str, int pixels, float x, float y)
         }
         glDisable(GL_BLEND);
         glBindVertexArray(0);
+
+        if (which == PIXEL_OFFSET) return spacing;
+
+        return spacing * width_unit_per_pixel + x;
 }
 
 // //ek need to return the bounding box of the rendered text
