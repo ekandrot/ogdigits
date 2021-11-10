@@ -8,9 +8,15 @@
 
 #include "shader.h"
 
+//-------------------------------------------------------------------------------------------
+
+void add_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods));
+void remove_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods));
+
+//-------------------------------------------------------------------------------------------
 
 extern void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-
+extern void init_client_og();
 
 struct client_renderer {
         virtual void render() = 0;
@@ -18,7 +24,7 @@ struct client_renderer {
 
 extern int og_main(client_renderer *renderer);
 
-
+//-------------------------------------------------------------------------------------------
 
 
 inline auto now() noexcept { return std::chrono::high_resolution_clock::now(); }

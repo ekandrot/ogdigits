@@ -244,7 +244,7 @@ GLFWwindow* create_window_onscreen(const char *window_name)
         GLFWmonitor *mainMonitor = glfwGetPrimaryMonitor();
         int mxpos, mypos, mwidth, mheight;
         glfwGetMonitorWorkarea(mainMonitor, &mxpos, &mypos, &mwidth, &mheight);
-        printf("mxpos %d, mypos %d, mwidth %d, mheight %d\n", mxpos, mypos, mwidth, mheight);
+        // printf("mxpos %d, mypos %d, mwidth %d, mheight %d\n", mxpos, mypos, mwidth, mheight);
 
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         GLFWwindow *window = glfwCreateWindow(prefs.width, prefs.height, window_name, NULL, NULL);
@@ -460,8 +460,8 @@ int og_main(client_renderer *renderer)
                 glfwTerminate();
 		return -1;
 	}
-	printf("GL version:  %s\n", glGetString(GL_VERSION));
-	printf("GLEW version:  %s\n", glewGetString(GLEW_VERSION));
+	// printf("GL version:  %s\n", glGetString(GL_VERSION));
+	// printf("GLEW version:  %s\n", glewGetString(GLEW_VERSION));
 
         glViewport(0, 0, prefs.width, prefs.height);
         glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
@@ -495,7 +495,7 @@ int og_main(client_renderer *renderer)
         glfwGetCursorPos(window, &xpos_prev, &ypos_prev);
 
 
-        //init_client_og();
+        init_client_og();
 
 
 

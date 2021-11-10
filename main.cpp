@@ -16,8 +16,6 @@
 #include "ogmain.h"
 
 
-int number_offset{0};
-
 //-------------------------------------------------------------------------------------------
 
 const std::string train_data_filename("../data/digits/train.csv");
@@ -28,9 +26,14 @@ const std::string submit_filename("submit.csv");
 struct Data : client_renderer {
         virtual void render();
 
+        Data() : number_offset(0) {}
+
         std::vector<int> Y;
         std::vector<int> x;
+        int number_offset;
 };
+
+Data *current_data;
 
 //-------------------------------------------------------------------------------------------
 
@@ -81,12 +84,12 @@ void load_test_data(const std::string& fname, std::vector<int> &x) {
 }
 
 void write_submit(const std::string& fname, const std::vector<int> &y) {
-    std::ofstream file(fname);
+        std::ofstream file(fname);
 
-    file << "ImageId,Label" << std::endl;
-    for (size_t i=0; i<y.size(); ++i) {
-        file << i+1 << "," << y[i] << std::endl;
-    }
+        file << "ImageId,Label" << std::endl;
+        for (size_t i=0; i<y.size(); ++i) {
+                file << i+1 << "," << y[i] << std::endl;
+        }
 }
 
 //------------------------------------------------------------------------------
@@ -95,11 +98,34 @@ void write_submit(const std::string& fname, const std::vector<int> &y) {
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
         // yoffset seems to be the changing value on my mouse
+        // -1 roll towards me
+        // +1 roll away from me
         // std::cout << "scroll_callback:  " << xoffset << ", " << yoffset << '\n';
-        number_offset -= yoffset;
+        current_data->number_offset -= yoffset;
 
-        if (number_offset < 0) number_offset = 0;
-        if (number_offset > 1000) number_offset = 1000;
+        if (current_data->number_offset < 0) current_data->number_offset = 0;
+        if (current_data->number_offset >= current_data->Y.size()) current_data->number_offset = current_data->Y.size() -1;
+}
+
+//-------------------------------------------------------------------------------------------
+
+bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+        if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9 && action == GLFW_PRESS) {
+                current_data->number_offset *= 10;
+                current_data->number_offset += key - GLFW_KEY_0;
+
+                if (current_data->number_offset >= current_data->Y.size()) current_data->number_offset = current_data->Y.size() -1;
+
+                return true;
+        }
+
+        if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS) {
+                current_data->number_offset /= 10;
+                return true;
+        }
+
+        return false;
 }
 
 //-------------------------------------------------------------------------------------------
@@ -107,19 +133,12 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 static GLuint texture_data_obj;
 void create_Data_texture(const std::vector<int> &x_train)
 {
-        static bool once{false};
-        if (!once) {
-                once = true;
-                glGenTextures(1, &texture_data_obj);
-        }
-
-
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
         float test[28*28];
 
         for (int i=0; i<28*28; ++i) {
-                test[i] = x_train[28*28*number_offset+i] / 255.0;
+                test[i] = x_train[28*28*current_data->number_offset+i] / 255.0;
         }
 
         const GLsizei texture_width = 28;
@@ -165,9 +184,17 @@ void Data::render()
         render_text(num.c_str(), 24, offset, 0.5);
 }
 
-
 //-------------------------------------------------------------------------------------------
 
+// called after OpenGL is initialized, so the client can create OpenGL objects, add handlers, etc
+void init_client_og()
+{
+        add_key_handler(selection_key_handler);
+
+        glGenTextures(1, &texture_data_obj);
+}
+
+//-------------------------------------------------------------------------------------------
 
 int main()
 {
@@ -178,6 +205,7 @@ int main()
 
 
         Data training_data;
+        current_data = &training_data;
 
         auto start_time = now();
         load_train_data(train_data_filename, training_data.Y, training_data.x);
