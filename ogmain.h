@@ -10,12 +10,12 @@
 
 //-------------------------------------------------------------------------------------------
 
-void add_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods));
-void remove_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods));
+void add_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods, void *blob));
+void remove_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods, void *blob));
 
 //-------------------------------------------------------------------------------------------
 
-extern void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+extern void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, void *blob);
 extern void init_client_og();
 
 struct client_renderer {
@@ -23,6 +23,8 @@ struct client_renderer {
 };
 
 extern int og_main(client_renderer *renderer);
+
+void set_client_blob(void *blob);
 
 //-------------------------------------------------------------------------------------------
 

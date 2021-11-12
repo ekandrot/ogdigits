@@ -29,7 +29,7 @@ float window_ratio;
 circle_obj *circle_32;
 
 
-
+void *client_blob;
 
 //------------------------------------------------------------------------------
 
@@ -117,19 +117,19 @@ void write_prefs_file(const char *file_name) {
 
 //-------------------------------------------------------------------------------------------
 
-std::vector<bool (*) (GLFWwindow* window, int key, int scancode, int action, int mods)> key_handlers;
+std::vector<bool (*) (GLFWwindow* window, int key, int scancode, int action, int mods, void *blob)> key_handlers;
 
-bool default_keys_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-bool dialog_keys_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-bool capture_keys_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+bool default_keys_callback(GLFWwindow* window, int key, int scancode, int action, int mods, void *blob);
+bool dialog_keys_callback(GLFWwindow* window, int key, int scancode, int action, int mods, void *blob);
+bool capture_keys_callback(GLFWwindow* window, int key, int scancode, int action, int mods, void *blob);
 
 
-void add_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods))
+void add_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods, void *blob))
 {
         key_handlers.push_back(function);
 }
 
-void remove_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods))
+void remove_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods, void *blob))
 {
         for (auto i = key_handlers.begin(); i != key_handlers.end(); ++i) {
                 if (*i == function) {
@@ -139,7 +139,7 @@ void remove_key_handler(bool (*function) (GLFWwindow* window, int key, int scanc
         }
 }
 
-bool default_keys_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+bool default_keys_callback(GLFWwindow* window, int key, int scancode, int action, int mods, void *blob)
 {
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
                 glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -169,7 +169,7 @@ bool default_keys_callback(GLFWwindow* window, int key, int scancode, int action
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
         for (auto i = key_handlers.rbegin(); i != key_handlers.rend(); ++i) {
-                if ((*i)(window, key, scancode, action, mods)) {
+                if ((*i)(window, key, scancode, action, mods, client_blob)) {
                         return;
                 }
         }
@@ -314,8 +314,10 @@ void draw_cursor()
 }
 
 
-void render_scene(client_renderer *renderer)
+void render_scene()
 {
+        client_renderer *renderer = (client_renderer*)client_blob;
+
         renderer->render();
 
         draw_cursor();
@@ -429,9 +431,20 @@ void init_opengl_objects()
 
 //-------------------------------------------------------------------------------------------
 
+void set_client_blob(void *blob)
+{
+        client_blob = blob;
+}
+
+static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+        client_scroll_callback(window, xoffset, yoffset, client_blob);
+}
 
 int og_main(client_renderer *renderer)
 {
+        client_blob = renderer;
+
         srand(time(NULL));
 
         load_init_file(PREFS_FILE_NAME);
@@ -535,7 +548,7 @@ int og_main(client_renderer *renderer)
                         }
 
 
-                        render_scene(renderer);
+                        render_scene();
                         glfwSwapBuffers(window);
                 }
 

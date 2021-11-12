@@ -33,7 +33,10 @@ struct Data : client_renderer {
         int number_offset;
 };
 
-Data *current_data;
+//-------------------------------------------------------------------------------------------
+
+Data *dataset0;
+Data *dataset1;
 
 //-------------------------------------------------------------------------------------------
 
@@ -46,7 +49,11 @@ void get_all_values(const char *first, const char *last, std::vector<int> &x) {
     }
 }
 
-void load_train_data(const std::string& fname, std::vector<int> &y, std::vector<int> &x) {
+void load_train_data(const std::string& fname, Data &data)
+{
+        std::vector<int> &x = data.x;
+        std::vector<int> &y = data.Y;
+
     std::ifstream file(fname);
 
     std::string str;
@@ -65,7 +72,11 @@ void load_train_data(const std::string& fname, std::vector<int> &y, std::vector<
     std::cout << "Training data, data elements, num of features:  " << x.size() / y.size() << std::endl;
 }
 
-void load_test_data(const std::string& fname, std::vector<int> &x) {
+void load_test_data(const std::string& fname, Data &data)
+{
+        std::vector<int> &x = data.x;
+        std::vector<int> &y = data.Y;
+
     std::ifstream file(fname);
 
     std::string str;
@@ -74,6 +85,7 @@ void load_test_data(const std::string& fname, std::vector<int> &x) {
     int element_count(0);
     while (std::getline(file, str)) {
         ++element_count;
+        y.push_back(0);         // this is our current guess
         get_all_values(str.c_str(), str.c_str()+str.size(), x);
     }
 
@@ -95,33 +107,47 @@ void write_submit(const std::string& fname, const std::vector<int> &y) {
 //------------------------------------------------------------------------------
 
 
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, void *blob)
 {
+        Data *data = (Data*)blob;
+
         // yoffset seems to be the changing value on my mouse
         // -1 roll towards me
         // +1 roll away from me
         // std::cout << "scroll_callback:  " << xoffset << ", " << yoffset << '\n';
-        current_data->number_offset -= yoffset;
+        data->number_offset -= yoffset;
 
-        if (current_data->number_offset < 0) current_data->number_offset = 0;
-        if (current_data->number_offset >= current_data->Y.size()) current_data->number_offset = current_data->Y.size() -1;
+        if (data->number_offset < 0) data->number_offset = 0;
+        if (data->number_offset >= data->Y.size()) data->number_offset = data->Y.size() -1;
 }
 
 //-------------------------------------------------------------------------------------------
 
-bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action, int mods)
+bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action, int mods, void *blob)
 {
-        if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9 && action == GLFW_PRESS) {
-                current_data->number_offset *= 10;
-                current_data->number_offset += key - GLFW_KEY_0;
+        Data *data = (Data*)blob;
 
-                if (current_data->number_offset >= current_data->Y.size()) current_data->number_offset = current_data->Y.size() -1;
+        if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9 && action == GLFW_PRESS) {
+                data->number_offset *= 10;
+                data->number_offset += key - GLFW_KEY_0;
+
+                if (data->number_offset >= data->Y.size()) data->number_offset = data->Y.size() -1;
 
                 return true;
         }
 
+        if (key == GLFW_KEY_F && action == GLFW_PRESS) {
+                set_client_blob(dataset0);
+                return true;
+        }
+        if (key == GLFW_KEY_G && action == GLFW_PRESS) {
+                set_client_blob(dataset1);
+                return true;
+        }
+
+
         if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS) {
-                current_data->number_offset /= 10;
+                data->number_offset /= 10;
                 return true;
         }
 
@@ -131,14 +157,14 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
 //-------------------------------------------------------------------------------------------
 
 static GLuint texture_data_obj;
-void create_Data_texture(const std::vector<int> &x_train)
+static void create_Data_texture(const std::vector<int> &x_train, int index)
 {
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
         float test[28*28];
 
         for (int i=0; i<28*28; ++i) {
-                test[i] = x_train[28*28*current_data->number_offset+i] / 255.0;
+                test[i] = x_train[28*28*index + i] / 255.0;
         }
 
         const GLsizei texture_width = 28;
@@ -153,7 +179,7 @@ void create_Data_texture(const std::vector<int> &x_train)
 
 void Data::render()
 {
-        create_Data_texture(x);
+        create_Data_texture(x, number_offset);
 
         glBindVertexArray(square_vao);
         texture_shader->use(0);
@@ -205,13 +231,21 @@ int main()
 
 
         Data training_data;
-        current_data = &training_data;
 
         auto start_time = now();
-        load_train_data(train_data_filename, training_data.Y, training_data.x);
+        load_train_data(train_data_filename, training_data);
         auto end_time = now();
         auto total_time = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         std::cout << "Total time loading training data:  " << total_time << " ms" << std::endl;
+
+
+        Data test_data;
+
+        // std::vector<int> guess_test;
+        load_test_data(test_data_filename, test_data);
+
+        dataset0 = &training_data;
+        dataset1 = &test_data;
 
         return og_main(&training_data);
 }
