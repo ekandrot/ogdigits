@@ -10,22 +10,25 @@
 
 //-------------------------------------------------------------------------------------------
 
-void add_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods, void *blob));
-void remove_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods, void *blob));
-
-//-------------------------------------------------------------------------------------------
-
-extern void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, void *blob);
-extern void init_client_og();
-
-struct client_renderer {
+struct ClientRenderer {
         virtual void render() = 0;
 };
 
-extern int og_main(client_renderer *renderer);
+
+//-------------------------------------------------------------------------------------------
+
+void add_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods, ClientRenderer *renderer));
+void remove_key_handler(bool (*function) (GLFWwindow* window, int key, int scancode, int action, int mods, ClientRenderer *renderer));
+
+//-------------------------------------------------------------------------------------------
+
+extern void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, ClientRenderer *blob);
+extern void init_client_og();
+
+extern int og_main(ClientRenderer *renderer);
 extern void render_help();
 
-void set_client_blob(client_renderer *blob);
+void set_client_renderer(ClientRenderer *renderer);
 
 //-------------------------------------------------------------------------------------------
 

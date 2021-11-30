@@ -25,7 +25,7 @@ const std::string test_data_filename("../data/digits/test.csv");
 const std::string submit_filename("submit.csv");
 
 
-struct Data_Renderer : public virtual Data, client_renderer {
+struct Data_Renderer : public virtual Data, ClientRenderer {
         virtual void render();
 };
 
@@ -56,9 +56,9 @@ void write_submit(const std::string& fname, const std::vector<int> &y) {
 //------------------------------------------------------------------------------
 
 
-void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, void *blob)
+void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, ClientRenderer *renderer)
 {
-        Data_Renderer *data = (Data_Renderer*)blob;
+        Data_Renderer *data = dynamic_cast<Data_Renderer*>(renderer);
 
         // yoffset seems to be the changing value on my mouse
         // -1 roll towards me
@@ -72,9 +72,9 @@ void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, 
 
 //-------------------------------------------------------------------------------------------
 
-bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action, int mods, void *blob)
+bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action, int mods, ClientRenderer *renderer)
 {
-        Data_Renderer *data = (Data_Renderer*)blob;
+        Data_Renderer *data = dynamic_cast<Data_Renderer*>(renderer);
 
         if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9 && action == GLFW_PRESS) {
                 data->displayed_index *= 10;
@@ -86,11 +86,11 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
         }
 
         if (key == GLFW_KEY_F && action == GLFW_PRESS) {
-                set_client_blob(training_dataset);
+                set_client_renderer(training_dataset);
                 return true;
         }
         if (key == GLFW_KEY_G && action == GLFW_PRESS) {
-                set_client_blob(testing_dataset);
+                set_client_renderer(testing_dataset);
                 return true;
         }
 
