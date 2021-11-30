@@ -13,6 +13,8 @@
 #include "text_engine.h"
 #include "image_loader.h"
 
+#include "data.h"
+
 #include "ogmain.h"
 
 
@@ -23,96 +25,24 @@ const std::string test_data_filename("../data/digits/test.csv");
 const std::string submit_filename("submit.csv");
 
 
-struct Data : client_renderer {
+struct Data_Renderer : public virtual Data, client_renderer {
         virtual void render();
-
-        Data() : num_examples(0), num_features(0), displayed_index(0) {}
-
-        virtual void load_data(const std::string& fname) = 0;
-
-        std::vector<int> x;
-        int num_examples;
-        int num_features;
-
-        std::string label;
-        int displayed_index;
 };
 
-
-struct TrainingData : Data {
+struct TrainingData_Renderer : public TrainingData, public Data_Renderer {
         virtual void render();
-        virtual void load_data(const std::string& fname);
-
-        std::vector<int> Y;
 };
 
-struct TestingData : Data {
+struct TestingData_Renderer : public TestingData, public Data_Renderer {
         virtual void render();
-        virtual void load_data(const std::string& fname);
 };
 
 
 //-------------------------------------------------------------------------------------------
 
-TrainingData *training_dataset;
-TestingData *testing_dataset;
+TrainingData_Renderer *training_dataset;
+TestingData_Renderer *testing_dataset;
 
-//-------------------------------------------------------------------------------------------
-
-void get_all_values(const char *first, const char *last, std::vector<int> &x) {
-    int value(0);
-    auto res = std::from_chars(first, last, value);
-    while (res.ec == std::errc()) {
-        x.push_back(value);
-        res = std::from_chars(res.ptr+1, last, value);
-    }
-}
-
-void TrainingData::load_data(const std::string& fname)
-{
-        std::ifstream file(fname);
-        label = fname;
-
-        std::string str;
-        std::getline(file, str);
-
-        // x.reserve(32928000);
-        while (std::getline(file, str)) {
-                int value(0);
-                auto res = std::from_chars(str.c_str(), str.c_str()+str.size(), value);
-                Y.push_back(value);
-                ++num_examples;
-                get_all_values(res.ptr+1, str.c_str()+str.size(), x);
-        }
-        num_features = x.size() / num_examples;
-
-        std::cout << "Training data, examples:  " << num_examples << std::endl;
-        std::cout << "Training data, targets:  " << Y.size() << std::endl;
-        std::cout << "Training data, data elements:  " << x.size() << std::endl;
-        std::cout << "num of features:  " << num_features << std::endl;
-        std::cout << "Training data, data elements, num of features:  " << x.size() / num_examples << std::endl;
-}
-
-void TestingData::load_data(const std::string& fname)
-{
-        std::ifstream file(fname);
-        label = fname;
-
-        std::string str;
-        std::getline(file, str);
-
-        while (std::getline(file, str)) {
-                ++num_examples;
-                get_all_values(str.c_str(), str.c_str()+str.size(), x);
-        }
-        num_features = x.size() / num_examples;
-
-        std::cout << std::endl;
-        std::cout << "Test data, examples:  " << num_examples << std::endl;
-        std::cout << "Test data, data elements:  " << x.size() << std::endl;
-        std::cout << "num of features:  " << num_features << std::endl;
-        std::cout << "Test data, data elements, num of features:  " << x.size() / num_examples << std::endl;
-}
 
 void write_submit(const std::string& fname, const std::vector<int> &y) {
         std::ofstream file(fname);
@@ -128,7 +58,7 @@ void write_submit(const std::string& fname, const std::vector<int> &y) {
 
 void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, void *blob)
 {
-        Data *data = (Data*)blob;
+        Data_Renderer *data = (Data_Renderer*)blob;
 
         // yoffset seems to be the changing value on my mouse
         // -1 roll towards me
@@ -144,7 +74,7 @@ void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, 
 
 bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action, int mods, void *blob)
 {
-        Data *data = (Data*)blob;
+        Data_Renderer *data = (Data_Renderer*)blob;
 
         if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9 && action == GLFW_PRESS) {
                 data->displayed_index *= 10;
@@ -173,6 +103,18 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
         return false;
 }
 
+// should be back in ogmain, with the datasets supplying additional help text for it to render
+// instead of this controlling all of the help text that has nothing to do with the datasets
+void render_help() {
+        render_text("F to display Training Data", 20, 10, 400, PIXEL_OFFSET);
+        render_text("G to display Test Data", 20, 10, 425, PIXEL_OFFSET);
+        render_text("h to toggle this help", 20, 10, 450, PIXEL_OFFSET);
+        render_text("<esc> to exit", 20, 10, 475, PIXEL_OFFSET);
+        render_text("-- Edit Selection Keys --", 20, 10, 500, PIXEL_OFFSET);
+        render_text("0..9 to change selection", 20, 10, 525, PIXEL_OFFSET);
+        render_text("Backspace to delete last digit", 20, 10, 550, PIXEL_OFFSET);
+}
+
 //-------------------------------------------------------------------------------------------
 
 static GLuint texture_data_obj;
@@ -196,8 +138,10 @@ static void create_Data_texture(const std::vector<int> &x_train, int index)
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
-void Data::render()
+void Data_Renderer::render()
 {
+        // display the selected digit in the left, upper 200x200 pixels
+
         create_Data_texture(x, displayed_index);
 
         glBindVertexArray(square_vao);
@@ -205,6 +149,8 @@ void Data::render()
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture_data_obj);
 
+        // move to left,upper, then scale to pixels for positioning
+        // then scale the unit square to 200x200 pixels in dimensions
         Matrix4f mat;
         mat *= translation_matrix(-1,1,0);
         mat *= scale_matrix(width_unit_per_pixel, height_unit_per_pixel, 1);
@@ -218,14 +164,6 @@ void Data::render()
 
         glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, 0);
         glBindVertexArray(0);
-
-        //  display help text
-        render_text("F to display Training Data", 20, 10, 400, PIXEL_OFFSET);
-        render_text("G to display Test Data", 20, 10, 425, PIXEL_OFFSET);
-        render_text("<esc> to exit", 20, 10, 450, PIXEL_OFFSET);
-        render_text("-- Edit Selection Keys --", 20, 10, 475, PIXEL_OFFSET);
-        render_text("0..9 to change selection", 20, 10, 500, PIXEL_OFFSET);
-        render_text("Backspace to delete last digit", 20, 10, 525, PIXEL_OFFSET);
 
         // display information about the selected data set
 
@@ -245,17 +183,17 @@ void Data::render()
         // display model info, internals, output, and guess(es)
 }
 
-void TrainingData::render()
+void TrainingData_Renderer::render()
 {
-        Data::render();
+        Data_Renderer::render();
 
         const std::string guess_label_text = "What it is:  " + std::to_string(Y[displayed_index]);
         render_text(guess_label_text.c_str(), 24, 10, 275, PIXEL_OFFSET);
 }
 
-void TestingData::render()
+void TestingData_Renderer::render()
 {
-        Data::render();
+        Data_Renderer::render();
 }
 
 //-------------------------------------------------------------------------------------------
@@ -278,7 +216,7 @@ int main()
         std::cout << n << " concurrent threads are supported.\n";
 
 
-        TrainingData training_data;
+        TrainingData_Renderer training_data;
 
         auto start_time = now();
         training_data.load_data(train_data_filename);
@@ -287,7 +225,7 @@ int main()
         std::cout << "Total time loading training data:  " << total_time << " ms" << std::endl;
 
 
-        TestingData test_data;
+        TestingData_Renderer test_data;
 
         // std::vector<int> guess_test;
         test_data.load_data(test_data_filename);

@@ -29,7 +29,7 @@ float window_ratio;
 circle_obj *circle_32;
 
 
-void *client_blob;
+client_renderer *client_blob;
 
 //------------------------------------------------------------------------------
 
@@ -43,6 +43,7 @@ struct Preferences {
         int height;
         int x;
         int y;
+        int help_on;
 };
 
 Preferences prefs;
@@ -78,6 +79,13 @@ void parse_init_window(std::ifstream &f)
                         fields >> prefs.x;
                 } if (field == "y") {
                         fields >> prefs.y;
+                } if (field == "help_on") {
+                        fields >> prefs.help_on;
+                        if (prefs.help_on > 0) {
+                                prefs.help_on = 1;
+                        } else {
+                                prefs.help_on = 0;
+                        }
                 }
         
                 std::getline(f, line);
@@ -90,6 +98,7 @@ void load_init_file(const char *file_name)
         prefs.width = W_WIDTH;
         prefs.x = 100;
         prefs.y = 100;
+        prefs.help_on = 1;
 
         std::ifstream infile(file_name);
         if (infile.is_open()) {
@@ -113,6 +122,7 @@ void write_prefs_file(const char *file_name) {
         infile << "height " << prefs.height << "\n";
         infile << "x " << prefs.x << "\n";
         infile << "y " << prefs.y << "\n";
+        infile << "help_on " << prefs.help_on << "\n";
 }
 
 //-------------------------------------------------------------------------------------------
@@ -141,6 +151,11 @@ void remove_key_handler(bool (*function) (GLFWwindow* window, int key, int scanc
 
 bool default_keys_callback(GLFWwindow* window, int key, int scancode, int action, int mods, void *blob)
 {
+        if (key == GLFW_KEY_H && action == GLFW_PRESS) {
+                prefs.help_on = 1 - prefs.help_on;
+                write_prefs_file(PREFS_FILE_NAME);
+                return true;        // toggling the help text
+        }
         if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
                 glfwSetWindowShouldClose(window, GLFW_TRUE);
                 return true;        // app is done, nothing more to do
@@ -169,7 +184,7 @@ bool default_keys_callback(GLFWwindow* window, int key, int scancode, int action
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
         for (auto i = key_handlers.rbegin(); i != key_handlers.rend(); ++i) {
-                if ((*i)(window, key, scancode, action, mods, client_blob)) {
+                if ((*i)(window, key, scancode, action, mods, (void*)client_blob)) {
                         return;
                 }
         }
@@ -316,9 +331,11 @@ void draw_cursor()
 
 void render_scene()
 {
-        client_renderer *renderer = (client_renderer*)client_blob;
+        client_blob->render();
 
-        renderer->render();
+        if (prefs.help_on) {
+                render_help();
+        }
 
         draw_cursor();
 }
@@ -431,7 +448,7 @@ void init_opengl_objects()
 
 //-------------------------------------------------------------------------------------------
 
-void set_client_blob(void *blob)
+void set_client_blob(client_renderer *blob)
 {
         client_blob = blob;
 }

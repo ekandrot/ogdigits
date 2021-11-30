@@ -23,8 +23,9 @@ struct client_renderer {
 };
 
 extern int og_main(client_renderer *renderer);
+extern void render_help();
 
-void set_client_blob(void *blob);
+void set_client_blob(client_renderer *blob);
 
 //-------------------------------------------------------------------------------------------
 

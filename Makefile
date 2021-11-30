@@ -123,6 +123,33 @@ ogdigits.app/fast:
 	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/build
 .PHONY : ogdigits.app/fast
 
+data.o: data.cpp.o
+
+.PHONY : data.o
+
+# target to build an object file
+data.cpp.o:
+	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/data.cpp.o
+.PHONY : data.cpp.o
+
+data.i: data.cpp.i
+
+.PHONY : data.i
+
+# target to preprocess a source file
+data.cpp.i:
+	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/data.cpp.i
+.PHONY : data.cpp.i
+
+data.s: data.cpp.s
+
+.PHONY : data.s
+
+# target to generate assembly for a file
+data.cpp.s:
+	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/data.cpp.s
+.PHONY : data.cpp.s
+
 image_loader.o: image_loader.cpp.o
 
 .PHONY : image_loader.o
@@ -267,6 +294,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
 	@echo "... ogdigits.app"
+	@echo "... data.o"
+	@echo "... data.i"
+	@echo "... data.s"
 	@echo "... image_loader.o"
 	@echo "... image_loader.i"
 	@echo "... image_loader.s"
