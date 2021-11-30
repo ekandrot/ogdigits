@@ -26,19 +26,36 @@ const std::string submit_filename("submit.csv");
 struct Data : client_renderer {
         virtual void render();
 
-        Data() : number_offset(0) {}
+        Data() : num_examples(0), num_features(0), displayed_index(0) {}
 
-        std::vector<int> Y;
+        virtual void load_data(const std::string& fname) = 0;
+
         std::vector<int> x;
+        int num_examples;
+        int num_features;
 
         std::string label;
-        int number_offset;
+        int displayed_index;
 };
+
+
+struct TrainingData : Data {
+        virtual void render();
+        virtual void load_data(const std::string& fname);
+
+        std::vector<int> Y;
+};
+
+struct TestingData : Data {
+        virtual void render();
+        virtual void load_data(const std::string& fname);
+};
+
 
 //-------------------------------------------------------------------------------------------
 
-Data *dataset0;
-Data *dataset1;
+TrainingData *training_dataset;
+TestingData *testing_dataset;
 
 //-------------------------------------------------------------------------------------------
 
@@ -51,13 +68,10 @@ void get_all_values(const char *first, const char *last, std::vector<int> &x) {
     }
 }
 
-void load_train_data(const std::string& fname, Data &data)
+void TrainingData::load_data(const std::string& fname)
 {
-        std::vector<int> &x = data.x;
-        std::vector<int> &y = data.Y;
-
         std::ifstream file(fname);
-        data.label = fname;
+        label = fname;
 
         std::string str;
         std::getline(file, str);
@@ -66,37 +80,38 @@ void load_train_data(const std::string& fname, Data &data)
         while (std::getline(file, str)) {
                 int value(0);
                 auto res = std::from_chars(str.c_str(), str.c_str()+str.size(), value);
-                y.push_back(value);
+                Y.push_back(value);
+                ++num_examples;
                 get_all_values(res.ptr+1, str.c_str()+str.size(), x);
         }
+        num_features = x.size() / num_examples;
 
-        std::cout << "Training data, targets:  " << y.size() << std::endl;
+        std::cout << "Training data, examples:  " << num_examples << std::endl;
+        std::cout << "Training data, targets:  " << Y.size() << std::endl;
         std::cout << "Training data, data elements:  " << x.size() << std::endl;
-        std::cout << "Training data, data elements, num of features:  " << x.size() / y.size() << std::endl;
+        std::cout << "num of features:  " << num_features << std::endl;
+        std::cout << "Training data, data elements, num of features:  " << x.size() / num_examples << std::endl;
 }
 
-void load_test_data(const std::string& fname, Data &data)
+void TestingData::load_data(const std::string& fname)
 {
-        std::vector<int> &x = data.x;
-        std::vector<int> &y = data.Y;
-
         std::ifstream file(fname);
-        data.label = fname;
+        label = fname;
 
         std::string str;
         std::getline(file, str);
 
-        int element_count(0);
         while (std::getline(file, str)) {
-                ++element_count;
-                y.push_back(0);         // this is our current guess
+                ++num_examples;
                 get_all_values(str.c_str(), str.c_str()+str.size(), x);
         }
+        num_features = x.size() / num_examples;
 
         std::cout << std::endl;
-        std::cout << "Test data, targets:  " << element_count << std::endl;
+        std::cout << "Test data, examples:  " << num_examples << std::endl;
         std::cout << "Test data, data elements:  " << x.size() << std::endl;
-        std::cout << "Test data, data elements, num of features:  " << x.size() / element_count << std::endl;
+        std::cout << "num of features:  " << num_features << std::endl;
+        std::cout << "Test data, data elements, num of features:  " << x.size() / num_examples << std::endl;
 }
 
 void write_submit(const std::string& fname, const std::vector<int> &y) {
@@ -119,10 +134,10 @@ void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, 
         // -1 roll towards me
         // +1 roll away from me
         // std::cout << "scroll_callback:  " << xoffset << ", " << yoffset << '\n';
-        data->number_offset -= yoffset;
+        data->displayed_index -= yoffset;
 
-        if (data->number_offset < 0) data->number_offset = 0;
-        if (data->number_offset >= data->Y.size()) data->number_offset = data->Y.size() -1;
+        if (data->displayed_index < 0) data->displayed_index = 0;
+        if (data->displayed_index >= data->num_examples) data->displayed_index = data->num_examples -1;
 }
 
 //-------------------------------------------------------------------------------------------
@@ -132,26 +147,26 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
         Data *data = (Data*)blob;
 
         if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9 && action == GLFW_PRESS) {
-                data->number_offset *= 10;
-                data->number_offset += key - GLFW_KEY_0;
+                data->displayed_index *= 10;
+                data->displayed_index += key - GLFW_KEY_0;
 
-                if (data->number_offset >= data->Y.size()) data->number_offset = data->Y.size() -1;
+                if (data->displayed_index >= data->num_examples) data->displayed_index = data->num_examples -1;
 
                 return true;
         }
 
         if (key == GLFW_KEY_F && action == GLFW_PRESS) {
-                set_client_blob(dataset0);
+                set_client_blob(training_dataset);
                 return true;
         }
         if (key == GLFW_KEY_G && action == GLFW_PRESS) {
-                set_client_blob(dataset1);
+                set_client_blob(testing_dataset);
                 return true;
         }
 
 
         if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS) {
-                data->number_offset /= 10;
+                data->displayed_index /= 10;
                 return true;
         }
 
@@ -183,7 +198,7 @@ static void create_Data_texture(const std::vector<int> &x_train, int index)
 
 void Data::render()
 {
-        create_Data_texture(x, number_offset);
+        create_Data_texture(x, displayed_index);
 
         glBindVertexArray(square_vao);
         texture_shader->use(0);
@@ -204,6 +219,7 @@ void Data::render()
         glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, 0);
         glBindVertexArray(0);
 
+        //  display help text
         render_text("F to display Training Data", 20, 10, 400, PIXEL_OFFSET);
         render_text("G to display Test Data", 20, 10, 425, PIXEL_OFFSET);
         render_text("<esc> to exit", 20, 10, 450, PIXEL_OFFSET);
@@ -211,15 +227,35 @@ void Data::render()
         render_text("0..9 to change selection", 20, 10, 500, PIXEL_OFFSET);
         render_text("Backspace to delete last digit", 20, 10, 525, PIXEL_OFFSET);
 
+        // display information about the selected data set
 
         const std::string dataset_label_text = "Dataset:  " + label;
-        render_text(dataset_label_text.c_str(), 24, 250, 200, PIXEL_OFFSET);
+        render_text(dataset_label_text.c_str(), 24, 250, 25, PIXEL_OFFSET);
 
-        const std::string pos_label_text = "Where it's at:  " + std::to_string(number_offset);
-        render_text(pos_label_text.c_str(), 24, 250, 250, PIXEL_OFFSET);
+        const std::string examples_label_text = "Examples:  " + std::to_string(num_examples);
+        render_text(examples_label_text.c_str(), 24, 250, 50, PIXEL_OFFSET);
+        
+        const std::string features_label_text = "Features:  " + std::to_string(num_features);
+        render_text(features_label_text.c_str(), 24, 250, 75, PIXEL_OFFSET);
+        
 
-        const std::string guess_label_text = "What it is:  " + std::to_string(Y[number_offset]);
-        render_text(guess_label_text.c_str(), 24, 10, 250, PIXEL_OFFSET);
+        const std::string pos_label_text = "Where it's at:  " + std::to_string(displayed_index);
+        render_text(pos_label_text.c_str(), 24, 10, 250, PIXEL_OFFSET);
+
+        // display model info, internals, output, and guess(es)
+}
+
+void TrainingData::render()
+{
+        Data::render();
+
+        const std::string guess_label_text = "What it is:  " + std::to_string(Y[displayed_index]);
+        render_text(guess_label_text.c_str(), 24, 10, 275, PIXEL_OFFSET);
+}
+
+void TestingData::render()
+{
+        Data::render();
 }
 
 //-------------------------------------------------------------------------------------------
@@ -242,22 +278,22 @@ int main()
         std::cout << n << " concurrent threads are supported.\n";
 
 
-        Data training_data;
+        TrainingData training_data;
 
         auto start_time = now();
-        load_train_data(train_data_filename, training_data);
+        training_data.load_data(train_data_filename);
         auto end_time = now();
         auto total_time = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         std::cout << "Total time loading training data:  " << total_time << " ms" << std::endl;
 
 
-        Data test_data;
+        TestingData test_data;
 
         // std::vector<int> guess_test;
-        load_test_data(test_data_filename, test_data);
+        test_data.load_data(test_data_filename);
 
-        dataset0 = &training_data;
-        dataset1 = &test_data;
+        training_dataset = &training_data;
+        testing_dataset = &test_data;
 
         return og_main(&training_data);
 }
