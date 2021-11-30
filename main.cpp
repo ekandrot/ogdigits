@@ -44,6 +44,8 @@ std::vector<int> guesses_testing;
 
 std::vector<int> *guesses = &guesses_training;
 
+FixedModel *model;
+
 //-------------------------------------------------------------------------------------------
 
 TrainingData_Renderer *training_dataset;
@@ -101,6 +103,12 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
                 guesses = &guesses_testing;
                 return true;
         }
+
+        if (key == GLFW_KEY_T && action == GLFW_PRESS) {
+                model->learn(training_dataset);
+                return true;
+        }
+
 
 
         if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS) {
@@ -190,8 +198,20 @@ void Data_Renderer::render()
 
         // display model info, internals, output, and guess(es)
 
-        const std::string guess_label_text = "What it could be:  " + std::to_string((*guesses)[displayed_index]);
+        int guess = model->predict_one(this, displayed_index);
+
+        const std::string guess_label_text = "What it could be:  " + std::to_string(guess);
+        // const std::string guess_label_text = "What it could be:  " + std::to_string((*guesses)[displayed_index]);
         render_text(guess_label_text.c_str(), 24, 250, 275, PIXEL_OFFSET);
+
+        const std::string timing_label_text = "How long did it take:  " + std::to_string(model->last_training_time_ms) + " ms";
+        render_text(timing_label_text.c_str(), 24, 250, 300, PIXEL_OFFSET);
+
+        const std::string correcct_label_text = "Correct:  " + std::to_string(model->num_correct);
+        render_text(correcct_label_text.c_str(), 24, 250, 325, PIXEL_OFFSET);
+
+        const std::string wrong_label_text = "Incorrect:  " + std::to_string(model->num_incorrect);
+        render_text(wrong_label_text.c_str(), 24, 250, 350, PIXEL_OFFSET);
 }
 
 void TrainingData_Renderer::render()
@@ -226,8 +246,6 @@ int main()
         unsigned int n = std::thread::hardware_concurrency();
         std::cout << n << " concurrent threads are supported.\n";
 
-        FixedModel model;
-
         TrainingData_Renderer training_data;
 
         auto start_time = now();
@@ -236,8 +254,10 @@ int main()
         auto total_time = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         std::cout << "Total time loading training data:  " << total_time << " ms" << std::endl;
 
+        model = new FixedModel(training_data.num_features);
+
         guesses_training.resize(training_data.num_examples);
-        model.predict(&training_data, guesses_training);
+        // model->predict(&training_data, guesses_training);
 
 
         TestingData_Renderer test_data;
@@ -245,7 +265,7 @@ int main()
         // std::vector<int> guess_test;
         test_data.load_data(test_data_filename);
         guesses_testing.resize(test_data.num_examples);
-        model.predict(&test_data, guesses_testing);
+        // model->predict(&test_data, guesses_testing);
 
         training_dataset = &training_data;
         testing_dataset = &test_data;
