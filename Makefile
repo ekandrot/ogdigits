@@ -150,6 +150,33 @@ data.cpp.s:
 	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/data.cpp.s
 .PHONY : data.cpp.s
 
+fixed_model.o: fixed_model.cpp.o
+
+.PHONY : fixed_model.o
+
+# target to build an object file
+fixed_model.cpp.o:
+	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/fixed_model.cpp.o
+.PHONY : fixed_model.cpp.o
+
+fixed_model.i: fixed_model.cpp.i
+
+.PHONY : fixed_model.i
+
+# target to preprocess a source file
+fixed_model.cpp.i:
+	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/fixed_model.cpp.i
+.PHONY : fixed_model.cpp.i
+
+fixed_model.s: fixed_model.cpp.s
+
+.PHONY : fixed_model.s
+
+# target to generate assembly for a file
+fixed_model.cpp.s:
+	$(MAKE) -f CMakeFiles/ogdigits.app.dir/build.make CMakeFiles/ogdigits.app.dir/fixed_model.cpp.s
+.PHONY : fixed_model.cpp.s
+
 image_loader.o: image_loader.cpp.o
 
 .PHONY : image_loader.o
@@ -297,6 +324,9 @@ help:
 	@echo "... data.o"
 	@echo "... data.i"
 	@echo "... data.s"
+	@echo "... fixed_model.o"
+	@echo "... fixed_model.i"
+	@echo "... fixed_model.s"
 	@echo "... image_loader.o"
 	@echo "... image_loader.i"
 	@echo "... image_loader.s"

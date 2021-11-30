@@ -14,6 +14,7 @@
 #include "image_loader.h"
 
 #include "data.h"
+#include "fixed_model.h"
 
 #include "ogmain.h"
 
@@ -37,6 +38,11 @@ struct TestingData_Renderer : public TestingData, public Data_Renderer {
         virtual void render();
 };
 
+
+std::vector<int> guesses_training;
+std::vector<int> guesses_testing;
+
+std::vector<int> *guesses = &guesses_training;
 
 //-------------------------------------------------------------------------------------------
 
@@ -87,10 +93,12 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
 
         if (key == GLFW_KEY_F && action == GLFW_PRESS) {
                 set_client_renderer(training_dataset);
+                guesses = &guesses_training;
                 return true;
         }
         if (key == GLFW_KEY_G && action == GLFW_PRESS) {
                 set_client_renderer(testing_dataset);
+                guesses = &guesses_testing;
                 return true;
         }
 
@@ -181,6 +189,9 @@ void Data_Renderer::render()
         render_text(pos_label_text.c_str(), 24, 10, 250, PIXEL_OFFSET);
 
         // display model info, internals, output, and guess(es)
+
+        const std::string guess_label_text = "What it could be:  " + std::to_string((*guesses)[displayed_index]);
+        render_text(guess_label_text.c_str(), 24, 250, 275, PIXEL_OFFSET);
 }
 
 void TrainingData_Renderer::render()
@@ -215,6 +226,7 @@ int main()
         unsigned int n = std::thread::hardware_concurrency();
         std::cout << n << " concurrent threads are supported.\n";
 
+        FixedModel model;
 
         TrainingData_Renderer training_data;
 
@@ -224,11 +236,16 @@ int main()
         auto total_time = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         std::cout << "Total time loading training data:  " << total_time << " ms" << std::endl;
 
+        guesses_training.resize(training_data.num_examples);
+        model.predict(&training_data, guesses_training);
+
 
         TestingData_Renderer test_data;
 
         // std::vector<int> guess_test;
         test_data.load_data(test_data_filename);
+        guesses_testing.resize(test_data.num_examples);
+        model.predict(&test_data, guesses_testing);
 
         training_dataset = &training_data;
         testing_dataset = &test_data;

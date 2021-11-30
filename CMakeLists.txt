@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 add_executable(ogdigits.app main.cpp)
 target_sources(ogdigits.app
         PRIVATE data.cpp
+        PRIVATE fixed_model.cpp
         PRIVATE ogmain.cpp
         PRIVATE shader.cpp
         PRIVATE image_loader.cpp
