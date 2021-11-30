@@ -168,6 +168,8 @@ float render_text(const std::string str, int pixels, float x, float y, TEXT_OFFS
         if (which == PIXEL_OFFSET) {
                 x *= width_unit_per_pixel;
                 y *= height_unit_per_pixel;
+                x = x - 1;
+                y = 1 - y;
         }
 
         glBindVertexArray(square_vao);

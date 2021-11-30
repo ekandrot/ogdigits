@@ -30,6 +30,8 @@ struct Data : client_renderer {
 
         std::vector<int> Y;
         std::vector<int> x;
+
+        std::string label;
         int number_offset;
 };
 
@@ -54,22 +56,23 @@ void load_train_data(const std::string& fname, Data &data)
         std::vector<int> &x = data.x;
         std::vector<int> &y = data.Y;
 
-    std::ifstream file(fname);
+        std::ifstream file(fname);
+        data.label = fname;
 
-    std::string str;
-    std::getline(file, str);
+        std::string str;
+        std::getline(file, str);
 
-    // x.reserve(32928000);
-    while (std::getline(file, str)) {
-        int value(0);
-        auto res = std::from_chars(str.c_str(), str.c_str()+str.size(), value);
-        y.push_back(value);
-        get_all_values(res.ptr+1, str.c_str()+str.size(), x);
-    }
+        // x.reserve(32928000);
+        while (std::getline(file, str)) {
+                int value(0);
+                auto res = std::from_chars(str.c_str(), str.c_str()+str.size(), value);
+                y.push_back(value);
+                get_all_values(res.ptr+1, str.c_str()+str.size(), x);
+        }
 
-    std::cout << "Training data, targets:  " << y.size() << std::endl;
-    std::cout << "Training data, data elements:  " << x.size() << std::endl;
-    std::cout << "Training data, data elements, num of features:  " << x.size() / y.size() << std::endl;
+        std::cout << "Training data, targets:  " << y.size() << std::endl;
+        std::cout << "Training data, data elements:  " << x.size() << std::endl;
+        std::cout << "Training data, data elements, num of features:  " << x.size() / y.size() << std::endl;
 }
 
 void load_test_data(const std::string& fname, Data &data)
@@ -77,22 +80,23 @@ void load_test_data(const std::string& fname, Data &data)
         std::vector<int> &x = data.x;
         std::vector<int> &y = data.Y;
 
-    std::ifstream file(fname);
+        std::ifstream file(fname);
+        data.label = fname;
 
-    std::string str;
-    std::getline(file, str);
+        std::string str;
+        std::getline(file, str);
 
-    int element_count(0);
-    while (std::getline(file, str)) {
-        ++element_count;
-        y.push_back(0);         // this is our current guess
-        get_all_values(str.c_str(), str.c_str()+str.size(), x);
-    }
+        int element_count(0);
+        while (std::getline(file, str)) {
+                ++element_count;
+                y.push_back(0);         // this is our current guess
+                get_all_values(str.c_str(), str.c_str()+str.size(), x);
+        }
 
-    std::cout << std::endl;
-    std::cout << "Test data, targets:  " << element_count << std::endl;
-    std::cout << "Test data, data elements:  " << x.size() << std::endl;
-    std::cout << "Test data, data elements, num of features:  " << x.size() / element_count << std::endl;
+        std::cout << std::endl;
+        std::cout << "Test data, targets:  " << element_count << std::endl;
+        std::cout << "Test data, data elements:  " << x.size() << std::endl;
+        std::cout << "Test data, data elements, num of features:  " << x.size() / element_count << std::endl;
 }
 
 void write_submit(const std::string& fname, const std::vector<int> &y) {
@@ -200,14 +204,22 @@ void Data::render()
         glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, 0);
         glBindVertexArray(0);
 
+        render_text("F to display Training Data", 20, 10, 400, PIXEL_OFFSET);
+        render_text("G to display Test Data", 20, 10, 425, PIXEL_OFFSET);
+        render_text("<esc> to exit", 20, 10, 450, PIXEL_OFFSET);
+        render_text("-- Edit Selection Keys --", 20, 10, 475, PIXEL_OFFSET);
+        render_text("0..9 to change selection", 20, 10, 500, PIXEL_OFFSET);
+        render_text("Backspace to delete last digit", 20, 10, 525, PIXEL_OFFSET);
 
-        float offset = render_text("Where it's at:", 24, -1, 250, PIXEL_OFFSET) + 10;
-        std::string pos = std::to_string(number_offset);
-        render_text(pos.c_str(), 24, offset, 250, PIXEL_OFFSET);
 
-        offset = render_text("What it is:", 24, -1, 0.5) + 10 * width_unit_per_pixel;
-        std::string num(1, (char)(Y[number_offset] + '0'));
-        render_text(num.c_str(), 24, offset, 0.5);
+        const std::string dataset_label_text = "Dataset:  " + label;
+        render_text(dataset_label_text.c_str(), 24, 250, 200, PIXEL_OFFSET);
+
+        const std::string pos_label_text = "Where it's at:  " + std::to_string(number_offset);
+        render_text(pos_label_text.c_str(), 24, 250, 250, PIXEL_OFFSET);
+
+        const std::string guess_label_text = "What it is:  " + std::to_string(Y[number_offset]);
+        render_text(guess_label_text.c_str(), 24, 10, 250, PIXEL_OFFSET);
 }
 
 //-------------------------------------------------------------------------------------------
