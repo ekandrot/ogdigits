@@ -8,7 +8,9 @@ struct Data {
 
         virtual void load_data(const std::string& fname) = 0;
 
-        std::vector<int> x;
+        inline float* row(int r) {return &x[r * num_features];}
+
+        std::vector<float> x;
         int num_examples;
         int num_features;
 

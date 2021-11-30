@@ -118,14 +118,14 @@ void render_help() {
 //-------------------------------------------------------------------------------------------
 
 static GLuint texture_data_obj;
-static void create_Data_texture(const std::vector<int> &x_train, int index)
+static void create_Data_texture(const std::vector<float> &x_train, int num_features, int index)
 {
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
         float test[28*28];
 
         for (int i=0; i<28*28; ++i) {
-                test[i] = x_train[28*28*index + i] / 255.0;
+                test[i] = (x_train[num_features*index + i] + 1) / 2;
         }
 
         const GLsizei texture_width = 28;
@@ -142,7 +142,7 @@ void Data_Renderer::render()
 {
         // display the selected digit in the left, upper 200x200 pixels
 
-        create_Data_texture(x, displayed_index);
+        create_Data_texture(x, num_features, displayed_index);
 
         glBindVertexArray(square_vao);
         texture_shader->use(0);

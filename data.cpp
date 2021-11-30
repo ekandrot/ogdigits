@@ -8,13 +8,15 @@
 
 //-------------------------------------------------------------------------------------------
 
-void get_all_values(const char *first, const char *last, std::vector<int> &x) {
-    int value(0);
-    auto res = std::from_chars(first, last, value);
-    while (res.ec == std::errc()) {
-        x.push_back(value);
-        res = std::from_chars(res.ptr+1, last, value);
-    }
+void get_all_values(const char *first, const char *last, std::vector<float> &x) {
+        int value(0);
+        auto res = std::from_chars(first, last, value);
+        while (res.ec == std::errc()) {
+                float fvalue = value / 255.0;
+                fvalue = fvalue * 2 - 1;
+                x.push_back(fvalue);
+                res = std::from_chars(res.ptr+1, last, value);
+        }
 }
 
 void TrainingData::load_data(const std::string& fname)
