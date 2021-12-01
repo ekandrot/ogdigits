@@ -1,5 +1,9 @@
 #pragma once
+
 #include <vector>
+#include <mutex>
+#include <chrono>
+
 #include "ModelStats.h"
 #include "data.h"
 
@@ -14,6 +18,8 @@ struct FixedModel {
         int predict_one(const Data *data, int selector);
         void eval(const TrainingData *data, ModelStats &stats);
 
+        std::mutex mtx;
+        std::chrono::_V2::system_clock::time_point  time_stamp;     // time stamp for last time model was updated
 
         float* layer1;          // input to hidden 1
         float* layer2;          // layer 1 to layer 2

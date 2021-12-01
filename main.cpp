@@ -7,6 +7,7 @@
 #include <sstream>
 #include <vector>
 #include <charconv>
+#include <thread>
 
 #include "math_3d.h"
 #include "shader.h"
@@ -19,6 +20,8 @@
 
 #include "ogmain.h"
 
+
+const int data_update_interval = 2;
 
 //-------------------------------------------------------------------------------------------
 
@@ -33,6 +36,7 @@ struct Data_Renderer : public virtual Data, ClientRenderer {
         void render() override;
 
         int displayed_index;    // which example is to be displayed
+        int lastest_guess;
 };
 
 struct TrainingData_Renderer : public TrainingData, public Data_Renderer {
@@ -47,6 +51,7 @@ struct TrainingData_Renderer : public TrainingData, public Data_Renderer {
         void data_update() override;    // called via a background thread
 
         ModelStats stats;       // accessed via a background thread - ???  does it need a lock?
+        std::chrono::_V2::system_clock::time_point last_model_stats_time_stamp;
 };
 
 struct TestingData_Renderer : public TestingData, public Data_Renderer {
@@ -110,7 +115,7 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
 
         if (key == GLFW_KEY_F && action == GLFW_PRESS) {
                 set_client_renderer(training_dataset);
-                set_update_interval(10);
+                set_update_interval(data_update_interval);
                 guesses = &guesses_training;
                 return true;
         }
@@ -122,7 +127,8 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
         }
 
         if (key == GLFW_KEY_T && action == GLFW_PRESS) {
-                model->learn(training_dataset);
+                std::thread(&FixedModel::learn, model, training_dataset).detach();
+                // model->learn(training_dataset);
                 return true;
         }
 
@@ -217,7 +223,10 @@ void Data_Renderer::render()
 
         int guess = model->predict_one(this, displayed_index);
 
-        const std::string guess_label_text = "What it could be:  " + std::to_string(guess);
+        if (guess >= 0) {
+                lastest_guess = guess;
+        }
+        const std::string guess_label_text = "What it could be:  " + std::to_string(lastest_guess);
         // const std::string guess_label_text = "What it could be:  " + std::to_string((*guesses)[displayed_index]);
         render_text(guess_label_text.c_str(), 24, 250, 275, PIXEL_OFFSET);
 
@@ -251,7 +260,13 @@ void TestingData_Renderer::render()
 
 void TrainingData_Renderer::data_update()
 {
-        model->eval(this, stats);
+        if (last_model_stats_time_stamp < model->time_stamp) {
+                ModelStats local_stats;
+                model->eval(this, local_stats);
+                stats = local_stats;
+                last_model_stats_time_stamp = model->time_stamp;
+        }
+
 }
 
 //-------------------------------------------------------------------------------------------
@@ -263,7 +278,7 @@ void init_client_og()
 
         glGenTextures(1, &texture_data_obj);
 
-        set_update_interval(10);
+        set_update_interval(data_update_interval);
 }
 
 //-------------------------------------------------------------------------------------------

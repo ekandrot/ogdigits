@@ -196,6 +196,7 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
                         return;
                 }
         }
+        refresh_needed = true;
 }
 
 static bool g_cursor_within_window{true};
@@ -214,12 +215,20 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos)
 {
         mousex = xpos;
         mousey = ypos;
+        refresh_needed = true;
 }
 
 void mouse_down_event(GLFWwindow* window, int button, int action, int mods)
 {
-
+        refresh_needed = true;
 }
+
+static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+        client_scroll_callback(window, xoffset, yoffset, client_renderer);
+        refresh_needed = true;
+}
+
 
 // void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 // {
@@ -246,6 +255,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
         gWindowWasResized = true;
         gResizedWindowWidth = width;
         gResizedWindowHeight = height;
+        refresh_needed = true;
 }
 
 void error_callback(int error, const char* description)
@@ -461,11 +471,6 @@ void set_client_renderer(ClientRenderer *renderer)
         client_renderer = renderer;
 }
 
-static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
-{
-        client_scroll_callback(window, xoffset, yoffset, client_renderer);
-}
-
 int og_main(ClientRenderer *renderer)
 {
         client_renderer = renderer;
@@ -535,8 +540,11 @@ int og_main(ClientRenderer *renderer)
 
         init_client_og();
 
+	glClearColor(0.5f, 0.75f, 0.5f, 1.0f);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
         double last_client_called{0};
+        int redraw_count{0};
 	while (!glfwWindowShouldClose(window)) {
                 double current_time = glfwGetTime();
                 double delta_time = current_time - last_time;
@@ -545,27 +553,14 @@ int og_main(ClientRenderer *renderer)
                         if (client_update_interval <= current_time - last_client_called) {
                                 last_client_called = current_time;
                                 std::thread (&ClientRenderer::data_update, renderer).detach();
+                                refresh_needed = true;
                         }
-                }
-
-                if (delta_time >= 0.01) {
-                        last_time = current_time;
-
-                        // update the cursor, if it in the window
-                        if (g_cursor_within_window) {
-                        	glClearColor(0.5f, 0.75f, 0.5f, 1.0f);
-                                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                        } else {
-                        	// glClearColor(0.5f, 0.0f, 0.0f, 0.0f);
-                                // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                        }
-
-                	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                        refresh_needed = true;
                 }
 
                 if (refresh_needed) {
                         refresh_needed = false;
+                        ++redraw_count;
+                        // std::cout << "redraw " << redraw_count << '\n';
 
                         if (gWindowWasResized) {
                                 gWindowWasResized = false;
@@ -579,6 +574,7 @@ int og_main(ClientRenderer *renderer)
                                 write_prefs_file(PREFS_FILE_NAME);
                         }
 
+                	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
                         render_scene();
                         glfwSwapBuffers(window);

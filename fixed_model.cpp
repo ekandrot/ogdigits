@@ -71,6 +71,8 @@ FixedModel::FixedModel(int _num_features) : num_features(_num_features), last_tr
         init_matrix(layer1, num_features * 25);
         init_matrix(layer2, 25 * 25);
         init_matrix(layer_out, 25 * 10);
+
+        time_stamp = now();
 }
 
 FixedModel::~FixedModel()
@@ -83,6 +85,8 @@ FixedModel::~FixedModel()
 
 void FixedModel::learn(const TrainingData *data)
 {
+        std::lock_guard<std::mutex> lck(mtx);
+
         const float learn_rate = 0.001;
 
         auto start_time = now();
@@ -118,10 +122,13 @@ void FixedModel::learn(const TrainingData *data)
 
         auto end_time = now();
         last_training_time_ms = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        time_stamp = now();
 }
 
 void FixedModel::eval(const TrainingData *data, ModelStats &stats)
 {
+        std::lock_guard<std::mutex> lck(mtx);
+        
         const float learn_rate = 0.001;
 
         auto start_time = now();
@@ -166,29 +173,35 @@ void FixedModel::eval(const TrainingData *data, ModelStats &stats)
 
 int FixedModel::predict_one(const Data *data, int selector)
 {
-        const int num_features = data->num_features;
-        const int num_examples = data->num_examples;
+        std::unique_lock<std::mutex> lock(mtx, std::try_to_lock);
+        if (lock.owns_lock()) {
+                const int num_features = data->num_features;
+                const int num_examples = data->num_examples;
 
-        const float *example = data->row(selector);
-        float hidden1[25];
-        matmul(example, hidden1, layer1, num_features, 25);
-        activation(hidden1, 25);
+                const float *example = data->row(selector);
+                float hidden1[25];
+                matmul(example, hidden1, layer1, num_features, 25);
+                activation(hidden1, 25);
 
-        float hidden2[25];
-        matmul(hidden1, hidden2, layer2, 25, 25);
-        activation(hidden2, 25);
+                float hidden2[25];
+                matmul(hidden1, hidden2, layer2, 25, 25);
+                activation(hidden2, 25);
 
-        float output[10];
-        matmul(hidden2, output, layer_out, 25, 10);
-        softmax(output, 10);
-        int ans = max_index(output, 10);
+                float output[10];
+                matmul(hidden2, output, layer_out, 25, 10);
+                softmax(output, 10);
+                int ans = max_index(output, 10);
 
-        return ans;
+                return ans;
+        }
 
+        return -1;
 }
 
 void FixedModel::predict(const Data *data, std::vector<int> &guesses)
 {
+        std::lock_guard<std::mutex> lck(mtx);
+
         const int num_features = data->num_features;
         const int num_examples = data->num_examples;
 
@@ -211,9 +224,6 @@ void FixedModel::predict(const Data *data, std::vector<int> &guesses)
 
                 guesses[r] = ans;
         }
-
-
-        // delete [] output;
 }
 
 //-------------------------------------------------------------------------------------------
