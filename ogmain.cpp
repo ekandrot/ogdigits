@@ -30,6 +30,7 @@ circle_obj *circle_32;
 
 
 ClientRenderer *client_renderer;
+int client_update_interval{-1};
 
 //------------------------------------------------------------------------------
 
@@ -180,6 +181,12 @@ bool default_keys_callback(GLFWwindow* window, int key, int scancode, int action
 // }
 
 //-------------------------------------------------------------------------------------------
+
+void set_update_interval(int seconds)
+{
+        client_update_interval = seconds;
+}
+
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -528,10 +535,17 @@ int og_main(ClientRenderer *renderer)
         init_client_og();
 
 
-
+        double last_client_called{0};
 	while (!glfwWindowShouldClose(window)) {
                 double current_time = glfwGetTime();
                 double delta_time = current_time - last_time;
+
+                if (client_update_interval > 0) {
+                        if (client_update_interval <= current_time - last_client_called) {
+                                last_client_called = current_time;
+                                renderer->data_update();
+                        }
+                }
 
                 if (delta_time >= 0.01) {
                         last_time = current_time;

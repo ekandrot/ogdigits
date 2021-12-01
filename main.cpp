@@ -15,6 +15,7 @@
 
 #include "data.h"
 #include "fixed_model.h"
+#include "ModelStats.h"
 
 #include "ogmain.h"
 
@@ -27,15 +28,29 @@ const std::string submit_filename("submit.csv");
 
 
 struct Data_Renderer : public virtual Data, ClientRenderer {
-        virtual void render();
+        Data_Renderer() : displayed_index(0) {}
+
+        void render() override;
+
+        int displayed_index;    // which example is to be displayed
 };
 
 struct TrainingData_Renderer : public TrainingData, public Data_Renderer {
-        virtual void render();
+        TrainingData_Renderer() {
+                stats.execution_time = 0;
+                stats.num_correct = 0;
+                stats.num_incorrect = 0;
+        }
+
+
+        void render() override;
+        void data_update() override;    // called via a background thread
+
+        ModelStats stats;       // accessed via a background thread - ???  does it need a lock?
 };
 
 struct TestingData_Renderer : public TestingData, public Data_Renderer {
-        virtual void render();
+        void render() override;
 };
 
 
@@ -95,11 +110,13 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
 
         if (key == GLFW_KEY_F && action == GLFW_PRESS) {
                 set_client_renderer(training_dataset);
+                set_update_interval(10);
                 guesses = &guesses_training;
                 return true;
         }
         if (key == GLFW_KEY_G && action == GLFW_PRESS) {
                 set_client_renderer(testing_dataset);
+                set_update_interval(-1);
                 guesses = &guesses_testing;
                 return true;
         }
@@ -206,12 +223,6 @@ void Data_Renderer::render()
 
         const std::string timing_label_text = "How long did it take:  " + std::to_string(model->last_training_time_ms) + " ms";
         render_text(timing_label_text.c_str(), 24, 250, 300, PIXEL_OFFSET);
-
-        const std::string correcct_label_text = "Correct:  " + std::to_string(model->num_correct);
-        render_text(correcct_label_text.c_str(), 24, 250, 325, PIXEL_OFFSET);
-
-        const std::string wrong_label_text = "Incorrect:  " + std::to_string(model->num_incorrect);
-        render_text(wrong_label_text.c_str(), 24, 250, 350, PIXEL_OFFSET);
 }
 
 void TrainingData_Renderer::render()
@@ -220,11 +231,27 @@ void TrainingData_Renderer::render()
 
         const std::string guess_label_text = "What it is:  " + std::to_string(Y[displayed_index]);
         render_text(guess_label_text.c_str(), 24, 10, 275, PIXEL_OFFSET);
+
+
+        const std::string timing_label_text = "Eval time:  " + std::to_string(stats.execution_time) + " ms";
+        render_text(timing_label_text.c_str(), 24, 250, 325, PIXEL_OFFSET);
+
+        const std::string correcct_label_text = "Correct:  " + std::to_string(stats.num_correct);
+        render_text(correcct_label_text.c_str(), 24, 250, 350, PIXEL_OFFSET);
+
+        const std::string wrong_label_text = "Incorrect:  " + std::to_string(stats.num_incorrect);
+        render_text(wrong_label_text.c_str(), 24, 250, 375, PIXEL_OFFSET);
 }
 
 void TestingData_Renderer::render()
 {
         Data_Renderer::render();
+}
+
+
+void TrainingData_Renderer::data_update()
+{
+        model->eval(this, stats);
 }
 
 //-------------------------------------------------------------------------------------------
@@ -235,6 +262,8 @@ void init_client_og()
         add_key_handler(selection_key_handler);
 
         glGenTextures(1, &texture_data_obj);
+
+        set_update_interval(10);
 }
 
 //-------------------------------------------------------------------------------------------

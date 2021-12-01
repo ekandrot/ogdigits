@@ -4,7 +4,7 @@
 #include <string>
 
 struct Data {
-        Data() : num_examples(0), num_features(0), displayed_index(0) {}
+        Data() : num_examples(0), num_features(0) {}
 
         virtual void load_data(const std::string& fname) = 0;
 
@@ -16,17 +16,16 @@ struct Data {
         int num_features;
 
         std::string label;
-        int displayed_index;
 };
 
 
 struct TrainingData : public virtual Data {
-        virtual void load_data(const std::string& fname);
+        void load_data(const std::string& fname) override;
 
         std::vector<int> Y;
 };
 
 struct TestingData : public virtual Data {
-        virtual void load_data(const std::string& fname);
+        void load_data(const std::string& fname) override;
 };
 

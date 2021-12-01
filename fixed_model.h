@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include "ModelStats.h"
 #include "data.h"
 
 //-------------------------------------------------------------------------------------------
@@ -11,6 +12,7 @@ struct FixedModel {
         void learn(const TrainingData *data);
         void predict(const Data *data, std::vector<int> &guesses);
         int predict_one(const Data *data, int selector);
+        void eval(const TrainingData *data, ModelStats &stats);
 
 
         float* layer1;          // input to hidden 1
@@ -21,8 +23,6 @@ struct FixedModel {
 
         // stats during learning
         int16_t last_training_time_ms;
-        int num_correct;
-        int num_incorrect;
 };
 
 //-------------------------------------------------------------------------------------------

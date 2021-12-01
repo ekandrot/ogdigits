@@ -12,6 +12,7 @@
 
 struct ClientRenderer {
         virtual void render() = 0;
+        virtual void data_update() {}
 };
 
 
@@ -29,6 +30,13 @@ extern int og_main(ClientRenderer *renderer);
 extern void render_help();
 
 void set_client_renderer(ClientRenderer *renderer);
+
+/*
+        -1 seconds is initial value, which is never
+        used to gather update data for display, slow background operations, like evaluating a model
+        ClientRenderer::data_update is invoked
+*/
+void set_update_interval(int seconds);
 
 //-------------------------------------------------------------------------------------------
 

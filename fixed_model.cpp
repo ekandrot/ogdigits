@@ -90,10 +90,49 @@ void FixedModel::learn(const TrainingData *data)
         const int num_features = data->num_features;
         const int num_examples = data->num_examples;
 
+        for (int r=0; r<num_examples; ++r) {
+                const float *example = data->row(r);
+                float hidden1[25];
+                matmul(example, hidden1, layer1, num_features, 25);
+                activation(hidden1, 25);
+
+                float hidden2[25];
+                matmul(hidden1, hidden2, layer2, 25, 25);
+                activation(hidden2, 25);
+
+                float output[10];
+                matmul(hidden2, output, layer_out, 25, 10);
+                softmax(output, 10);
+                int ans = max_index(output, 10);
+
+
+                int t[10] = {0};
+                t[data->Y[r]] = 1;
+
+                for (int j=0; j<10; ++j) {
+                        for (int i=0; i<25; ++i) {
+                                layer_out[i + j*25] += (t[j] - output[j]) * hidden2[i] * learn_rate;
+                        }
+                }
+        }
+
+        auto end_time = now();
+        last_training_time_ms = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+}
+
+void FixedModel::eval(const TrainingData *data, ModelStats &stats)
+{
+        const float learn_rate = 0.001;
+
+        auto start_time = now();
+
+        const int num_features = data->num_features;
+        const int num_examples = data->num_examples;
+
         // int* output = new int[num_examples];
 
-        num_correct = 0;
-        num_incorrect = 0;
+        stats.num_correct = 0;
+        stats.num_incorrect = 0;
 
         for (int r=0; r<num_examples; ++r) {
                 const float *example = data->row(r);
@@ -115,20 +154,14 @@ void FixedModel::learn(const TrainingData *data)
                 t[data->Y[r]] = 1;
 
                 if (data->Y[r] ==  ans) {
-                        ++num_correct;
+                        ++stats.num_correct;
                 } else {
-                        ++num_incorrect;
-                }
-
-                for (int j=0; j<10; ++j) {
-                        for (int i=0; i<25; ++i) {
-                                layer_out[i + j*25] += (t[j] - output[j]) * hidden2[i] * learn_rate;
-                        }
+                        ++stats.num_incorrect;
                 }
         }
 
         auto end_time = now();
-        last_training_time_ms = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        stats.execution_time = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 }
 
 int FixedModel::predict_one(const Data *data, int selector)
