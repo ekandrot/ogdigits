@@ -22,7 +22,7 @@ find_package(glfw3 3.3 REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(JPEG REQUIRED)
 
-include_directories( "~/arcane/eklib" ${OPENGL_INCLUDE_DIRS} ${PNG_INCLUDE_DIRS}  ${GLFW_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS} )
+include_directories( ${OPENGL_INCLUDE_DIRS} ${PNG_INCLUDE_DIRS}  ${GLFW_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS} )
 
 target_link_libraries(ogdigits.app ${OPENGL_LIBRARIES} ${PNG_LIBRARIES} ${JPEG_LIBRARIES} glfw GLEW::GLEW )
 
