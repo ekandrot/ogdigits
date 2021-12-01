@@ -6,6 +6,7 @@
 #include <sstream>
 #include <vector>
 #include <charconv>
+#include <thread>
 
 #include "math_3d.h"
 #include "shader.h"
@@ -543,7 +544,7 @@ int og_main(ClientRenderer *renderer)
                 if (client_update_interval > 0) {
                         if (client_update_interval <= current_time - last_client_called) {
                                 last_client_called = current_time;
-                                renderer->data_update();
+                                std::thread (&ClientRenderer::data_update, renderer).detach();
                         }
                 }
 

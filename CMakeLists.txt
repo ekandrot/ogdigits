@@ -21,10 +21,12 @@ find_package(OpenGL REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(JPEG REQUIRED)
+find_package(Threads REQUIRED)
 
 include_directories( ${OPENGL_INCLUDE_DIRS} ${PNG_INCLUDE_DIRS}  ${GLFW_INCLUDE_DIRS} ${GLEW_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS} )
 
 target_link_libraries(ogdigits.app ${OPENGL_LIBRARIES} ${PNG_LIBRARIES} ${JPEG_LIBRARIES} glfw GLEW::GLEW )
+target_link_libraries( ${PROJECT_NAME} ${CMAKE_THREAD_LIBS_INIT} )
 
 set(default_build_type "Release")
 
