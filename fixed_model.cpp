@@ -7,9 +7,50 @@
 inline auto now() noexcept { return std::chrono::high_resolution_clock::now(); }
 
 
-float activation(float x)
+void activation(float *x, int len)
 {
-        return tanh(x);
+        for (int i=0; i<len; ++i) {
+                x[i] = tanh(x[i]);
+        }
+}
+
+void softmax(float *x, int len)
+{
+        float sum{0};
+        for (int i=0; i<len; ++i) {
+                x[i] = exp(x[i]);
+                sum += x[i];
+        }
+        for (int i=0; i<len; ++i) {
+                x[i] /= sum;
+        }
+}
+
+int max_index(float *x, int len)
+{
+        float max_value{x[0]};
+        int max_index{0};
+        for (int i=1; i<10; ++i) {
+                if (x[i] > max_value) {
+                        max_value = x[i];
+                        max_index = i;
+                }
+        }
+        return max_index;
+}
+
+// matrix is M rows by N columns
+// input is M long
+// output is N long
+void matmul(const float *input, float *output, float *matrix, int M, int N)
+{
+        for (int j=0; j<N; ++j) {
+                float value{0};
+                for (int i=0; i<M; ++i) {
+                        value += input[i] * matrix[i + M * j];
+                }
+                output[j] = value;
+        }
 }
 
 void init_matrix(float *m, int values)
@@ -42,6 +83,8 @@ FixedModel::~FixedModel()
 
 void FixedModel::learn(const TrainingData *data)
 {
+        const float learn_rate = 0.001;
+
         auto start_time = now();
 
         const int num_features = data->num_features;
@@ -55,53 +98,31 @@ void FixedModel::learn(const TrainingData *data)
         for (int r=0; r<num_examples; ++r) {
                 const float *example = data->row(r);
                 float hidden1[25];
-                for (int j=0; j<25; ++j) {
-                        float value{0};
-                        for (int i=0; i<num_features; ++i) {
-                                value += example[i] * layer1[i + num_features * j];
-                        }
-                        hidden1[j] = value;
-                }
-                for (int i=0; i<25; ++i) {
-                        hidden1[i] = activation(hidden1[i]);
-                }
+                matmul(example, hidden1, layer1, num_features, 25);
+                activation(hidden1, 25);
 
                 float hidden2[25];
-                for (int j=0; j<25; ++j) {
-                        float value{0};
-                        for (int i=0; i<25; ++i) {
-                                value += hidden1[i] * layer2[i + 25 * j];
-                        }
-                        hidden2[j] = value;
-                }
-                for (int i=0; i<25; ++i) {
-                        hidden1[i] = activation(hidden1[i]);
-                }
+                matmul(hidden1, hidden2, layer2, 25, 25);
+                activation(hidden2, 25);
 
                 float output[10];
-                for (int j=0; j<10; ++j) {
-                        float value{0};
-                        for (int i=0; i<25; ++i) {
-                                value += hidden2[i] * layer_out[i + 25 * j];
-                        }
-                        output[j] = value;
-                }
+                matmul(hidden2, output, layer_out, 25, 10);
+                softmax(output, 10);
+                int ans = max_index(output, 10);
 
-                float max_value{output[0]};
-                int max_index{0};
-                for (int i=1; i<10; ++i) {
-                        if (output[i] > max_value) {
-                                max_value = output[i];
-                                max_index = i;
-                        }
-                }
 
-                if (data->Y[r] ==  max_index) {
+                int t[10] = {0};
+                t[data->Y[r]] = 1;
+
+                if (data->Y[r] ==  ans) {
                         ++num_correct;
                 } else {
                         ++num_incorrect;
+                }
+
+                for (int j=0; j<10; ++j) {
                         for (int i=0; i<25; ++i) {
-                                layer_out[i + 25 * max_index] -= hidden2[i] * 0.001;
+                                layer_out[i + j*25] += (t[j] - output[j]) * hidden2[i] * learn_rate;
                         }
                 }
         }
@@ -115,55 +136,23 @@ int FixedModel::predict_one(const Data *data, int selector)
         const int num_features = data->num_features;
         const int num_examples = data->num_examples;
 
-        // int* output = new int[num_examples];
-
         const float *example = data->row(selector);
         float hidden1[25];
-        for (int j=0; j<25; ++j) {
-                float value{0};
-                for (int i=0; i<num_features; ++i) {
-                        value += example[i] * layer1[i + num_features * j];
-                }
-                hidden1[j] = value;
-        }
-        for (int i=0; i<25; ++i) {
-                hidden1[i] = activation(hidden1[i]);
-        }
+        matmul(example, hidden1, layer1, num_features, 25);
+        activation(hidden1, 25);
 
         float hidden2[25];
-        for (int j=0; j<25; ++j) {
-                float value{0};
-                for (int i=0; i<25; ++i) {
-                        value += hidden1[i] * layer2[i + 25 * j];
-                }
-                hidden2[j] = value;
-        }
-        for (int i=0; i<25; ++i) {
-                hidden1[i] = activation(hidden1[i]);
-        }
+        matmul(hidden1, hidden2, layer2, 25, 25);
+        activation(hidden2, 25);
 
         float output[10];
-        for (int j=0; j<10; ++j) {
-                float value{0};
-                for (int i=0; i<25; ++i) {
-                        value += hidden2[i] * layer_out[i + 25 * j];
-                }
-                output[j] = value;
-        }
+        matmul(hidden2, output, layer_out, 25, 10);
+        softmax(output, 10);
+        int ans = max_index(output, 10);
 
-        float max_value{output[0]};
-        int max_index{0};
-        for (int i=1; i<10; ++i) {
-                if (output[i] > max_value) {
-                        max_value = output[i];
-                        max_index = i;
-                }
-        }
-
-        return max_index;
+        return ans;
 
 }
-
 
 void FixedModel::predict(const Data *data, std::vector<int> &guesses)
 {
@@ -175,48 +164,19 @@ void FixedModel::predict(const Data *data, std::vector<int> &guesses)
         for (int r=0; r<num_examples; ++r) {
                 const float *example = data->row(r);
                 float hidden1[25];
-                for (int j=0; j<25; ++j) {
-                        float value{0};
-                        for (int i=0; i<num_features; ++i) {
-                                value += example[i] * layer1[i + num_features * j];
-                        }
-                        hidden1[j] = value;
-                }
-                for (int i=0; i<25; ++i) {
-                        hidden1[i] = activation(hidden1[i]);
-                }
+                matmul(example, hidden1, layer1, num_features, 25);
+                activation(hidden1, 25);
 
                 float hidden2[25];
-                for (int j=0; j<25; ++j) {
-                        float value{0};
-                        for (int i=0; i<25; ++i) {
-                                value += hidden1[i] * layer2[i + 25 * j];
-                        }
-                        hidden2[j] = value;
-                }
-                for (int i=0; i<25; ++i) {
-                        hidden1[i] = activation(hidden1[i]);
-                }
+                matmul(hidden1, hidden2, layer2, 25, 25);
+                activation(hidden2, 25);
 
                 float output[10];
-                for (int j=0; j<10; ++j) {
-                        float value{0};
-                        for (int i=0; i<25; ++i) {
-                                value += hidden2[i] * layer_out[i + 25 * j];
-                        }
-                        output[j] = value;
-                }
+                matmul(hidden2, output, layer_out, 25, 10);
+                softmax(output, 10);
+                int ans = max_index(output, 10);
 
-                float max_value{output[0]};
-                int max_index{0};
-                for (int i=1; i<10; ++i) {
-                        if (output[i] > max_value) {
-                                max_value = output[i];
-                                max_index = i;
-                        }
-                }
-
-                guesses[r] = max_index;
+                guesses[r] = ans;
         }
 
 

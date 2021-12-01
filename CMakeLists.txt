@@ -27,3 +27,13 @@ include_directories( "~/arcane/eklib" ${OPENGL_INCLUDE_DIRS} ${PNG_INCLUDE_DIRS}
 target_link_libraries(ogdigits.app ${OPENGL_LIBRARIES} ${PNG_LIBRARIES} ${JPEG_LIBRARIES} glfw GLEW::GLEW )
 
 set(default_build_type "Release")
+
+ADD_CUSTOM_TARGET(debug
+  COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug ${CMAKE_SOURCE_DIR}
+  COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
+  COMMENT "Creating the executable in the debug mode.")
+
+ADD_CUSTOM_TARGET(release
+  COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ${CMAKE_SOURCE_DIR}
+  COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target all
+  COMMENT "Creating the executable in the release mode.")
