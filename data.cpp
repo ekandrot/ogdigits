@@ -37,11 +37,11 @@ void TrainingData::load_data(const std::string& fname)
         }
         num_features = x.size() / num_examples;
 
-        std::cout << "Training data, examples:  " << num_examples << std::endl;
-        std::cout << "Training data, targets:  " << Y.size() << std::endl;
-        std::cout << "Training data, data elements:  " << x.size() << std::endl;
-        std::cout << "num of features:  " << num_features << std::endl;
-        std::cout << "Training data, data elements, num of features:  " << x.size() / num_examples << std::endl;
+        // std::cout << "Training data, examples:  " << num_examples << std::endl;
+        // std::cout << "Training data, targets:  " << Y.size() << std::endl;
+        // std::cout << "Training data, data elements:  " << x.size() << std::endl;
+        // std::cout << "num of features:  " << num_features << std::endl;
+        // std::cout << "Training data, data elements, num of features:  " << x.size() / num_examples << std::endl;
 }
 
 void TestingData::load_data(const std::string& fname)
@@ -58,11 +58,11 @@ void TestingData::load_data(const std::string& fname)
         }
         num_features = x.size() / num_examples;
 
-        std::cout << std::endl;
-        std::cout << "Test data, examples:  " << num_examples << std::endl;
-        std::cout << "Test data, data elements:  " << x.size() << std::endl;
-        std::cout << "num of features:  " << num_features << std::endl;
-        std::cout << "Test data, data elements, num of features:  " << x.size() / num_examples << std::endl;
+        // std::cout << std::endl;
+        // std::cout << "Test data, examples:  " << num_examples << std::endl;
+        // std::cout << "Test data, data elements:  " << x.size() << std::endl;
+        // std::cout << "num of features:  " << num_features << std::endl;
+        // std::cout << "Test data, data elements, num of features:  " << x.size() / num_examples << std::endl;
 }
 
 //-------------------------------------------------------------------------------------------

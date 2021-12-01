@@ -31,10 +31,11 @@ const std::string submit_filename("submit.csv");
 
 
 struct Data_Renderer : public virtual Data, ClientRenderer {
-        Data_Renderer() : displayed_index(0) {}
+        Data_Renderer() : time_to_load(0), displayed_index(0) {}
 
         void render() override;
 
+        int64_t time_to_load;
         int displayed_index;    // which example is to be displayed
         int lastest_guess;
 };
@@ -66,10 +67,29 @@ std::vector<int> *guesses = &guesses_training;
 
 FixedModel *model;
 
+
+struct Panel : ClientRenderer {
+        void render() override;
+
+        void set_display_training() { dataset_displayed = training_dataset; }
+        void set_display_testing() { dataset_displayed = testing_dataset; }
+
+        Data_Renderer *dataset_displayed;
+
+        TrainingData_Renderer *training_dataset;
+        TestingData_Renderer *testing_dataset;
+};
+
+
+void Panel::render()
+{
+        dataset_displayed->render();
+}
+
+Panel *panel;
+
 //-------------------------------------------------------------------------------------------
 
-TrainingData_Renderer *training_dataset;
-TestingData_Renderer *testing_dataset;
 
 
 void write_submit(const std::string& fname, const std::vector<int> &y) {
@@ -86,7 +106,7 @@ void write_submit(const std::string& fname, const std::vector<int> &y) {
 
 void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, ClientRenderer *renderer)
 {
-        Data_Renderer *data = dynamic_cast<Data_Renderer*>(renderer);
+        Data_Renderer *data = panel->dataset_displayed;
 
         // yoffset seems to be the changing value on my mouse
         // -1 roll towards me
@@ -102,40 +122,35 @@ void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, 
 
 bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action, int mods, ClientRenderer *renderer)
 {
-        Data_Renderer *data = dynamic_cast<Data_Renderer*>(renderer);
+        Data_Renderer *data = panel->dataset_displayed;
 
         if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9 && action == GLFW_PRESS) {
                 data->displayed_index *= 10;
                 data->displayed_index += key - GLFW_KEY_0;
 
-                if (data->displayed_index >= data->num_examples) data->displayed_index = data->num_examples -1;
+                if (data->displayed_index >= data->num_examples) {
+                        data->displayed_index = data->num_examples -1;
+                }
 
+                return true;
+        }
+
+        if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS) {
+                data->displayed_index /= 10;
                 return true;
         }
 
         if (key == GLFW_KEY_F && action == GLFW_PRESS) {
-                set_client_renderer(training_dataset);
-                set_update_interval(data_update_interval);
-                guesses = &guesses_training;
+                panel->set_display_training();
                 return true;
         }
         if (key == GLFW_KEY_G && action == GLFW_PRESS) {
-                set_client_renderer(testing_dataset);
-                set_update_interval(-1);
-                guesses = &guesses_testing;
+                panel->set_display_testing();
                 return true;
         }
 
         if (key == GLFW_KEY_T && action == GLFW_PRESS) {
-                std::thread(&FixedModel::learn, model, training_dataset).detach();
-                // model->learn(training_dataset);
-                return true;
-        }
-
-
-
-        if (key == GLFW_KEY_BACKSPACE && action == GLFW_PRESS) {
-                data->displayed_index /= 10;
+                // std::thread(&FixedModel::learn, model, training_dataset).detach();
                 return true;
         }
 
@@ -214,7 +229,12 @@ void Data_Renderer::render()
         
         const std::string features_label_text = "Features:  " + std::to_string(num_features);
         render_text(features_label_text.c_str(), 24, 250, 75, PIXEL_OFFSET);
-        
+
+        const std::string load_time_label_text = "How long to load:  " + std::to_string(time_to_load) + " ms";
+        render_text(load_time_label_text.c_str(), 24, 250, 100, PIXEL_OFFSET);
+
+
+
 
         const std::string pos_label_text = "Where it's at:  " + std::to_string(displayed_index);
         render_text(pos_label_text.c_str(), 24, 10, 250, PIXEL_OFFSET);
@@ -230,8 +250,19 @@ void Data_Renderer::render()
         // const std::string guess_label_text = "What it could be:  " + std::to_string((*guesses)[displayed_index]);
         render_text(guess_label_text.c_str(), 24, 250, 275, PIXEL_OFFSET);
 
-        const std::string timing_label_text = "How long did it take:  " + std::to_string(model->last_training_time_ms) + " ms";
+
+        const std::string timing_label_text = "How long to process:  " + std::to_string(model->last_training_time_ms) + " ms";
         render_text(timing_label_text.c_str(), 24, 250, 300, PIXEL_OFFSET);
+
+
+        // const std::string timing_label_text = "Eval time:  " + std::to_string(stats.execution_time) + " ms";
+        // render_text(timing_label_text.c_str(), 24, 250, 325, PIXEL_OFFSET);
+
+        // const std::string correcct_label_text = "Correct:  " + std::to_string(stats.num_correct);
+        // render_text(correcct_label_text.c_str(), 24, 250, 350, PIXEL_OFFSET);
+
+        // const std::string wrong_label_text = "Incorrect:  " + std::to_string(stats.num_incorrect);
+        // render_text(wrong_label_text.c_str(), 24, 250, 375, PIXEL_OFFSET);
 }
 
 void TrainingData_Renderer::render()
@@ -240,16 +271,6 @@ void TrainingData_Renderer::render()
 
         const std::string guess_label_text = "What it is:  " + std::to_string(Y[displayed_index]);
         render_text(guess_label_text.c_str(), 24, 10, 275, PIXEL_OFFSET);
-
-
-        const std::string timing_label_text = "Eval time:  " + std::to_string(stats.execution_time) + " ms";
-        render_text(timing_label_text.c_str(), 24, 250, 325, PIXEL_OFFSET);
-
-        const std::string correcct_label_text = "Correct:  " + std::to_string(stats.num_correct);
-        render_text(correcct_label_text.c_str(), 24, 250, 350, PIXEL_OFFSET);
-
-        const std::string wrong_label_text = "Incorrect:  " + std::to_string(stats.num_incorrect);
-        render_text(wrong_label_text.c_str(), 24, 250, 375, PIXEL_OFFSET);
 }
 
 void TestingData_Renderer::render()
@@ -287,8 +308,8 @@ int main()
 {
         srand(time(NULL));
 
-        unsigned int n = std::thread::hardware_concurrency();
-        std::cout << n << " concurrent threads are supported.\n";
+        // unsigned int n = std::thread::hardware_concurrency();
+        // std::cout << n << " concurrent threads are supported.\n";
 
         TrainingData_Renderer training_data;
 
@@ -296,23 +317,22 @@ int main()
         training_data.load_data(train_data_filename);
         auto end_time = now();
         auto total_time = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-        std::cout << "Total time loading training data:  " << total_time << " ms" << std::endl;
+        training_data.time_to_load = total_time;
 
         model = new FixedModel(training_data.num_features);
 
-        guesses_training.resize(training_data.num_examples);
-        // model->predict(&training_data, guesses_training);
-
-
         TestingData_Renderer test_data;
 
-        // std::vector<int> guess_test;
+        start_time = now();
         test_data.load_data(test_data_filename);
-        guesses_testing.resize(test_data.num_examples);
-        // model->predict(&test_data, guesses_testing);
+        end_time = now();
+        total_time = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        test_data.time_to_load = total_time;
 
-        training_dataset = &training_data;
-        testing_dataset = &test_data;
+        panel = new Panel();
+        panel->training_dataset = &training_data;
+        panel->testing_dataset = &test_data;
+        panel->set_display_training();
 
-        return og_main(&training_data);
+        return og_main(panel);
 }

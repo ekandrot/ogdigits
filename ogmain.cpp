@@ -466,10 +466,10 @@ void init_opengl_objects()
 
 //-------------------------------------------------------------------------------------------
 
-void set_client_renderer(ClientRenderer *renderer)
-{
-        client_renderer = renderer;
-}
+// void set_client_renderer(ClientRenderer *renderer)
+// {
+//         client_renderer = renderer;
+// }
 
 int og_main(ClientRenderer *renderer)
 {
