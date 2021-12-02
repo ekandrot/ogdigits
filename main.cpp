@@ -54,7 +54,8 @@ struct FixedModel_Renderer : public ClientRenderer {
                 stats.execution_time = 0;
                 stats.num_correct = 0;
                 stats.num_incorrect = 0;
-
+                
+                L = 0;
                 label = "Fixed Model";
         }
 
@@ -68,7 +69,7 @@ struct FixedModel_Renderer : public ClientRenderer {
                 if (lock.owns_lock()) {
                         if (last_model_stats_time_stamp < model->time_stamp) {
                                 ModelStats local_stats;
-                                model->eval(data, local_stats); // will block waiting its turn
+                                L = model->eval(data, local_stats); // will block waiting its turn
                                 stats = local_stats;
                                 last_model_stats_time_stamp = model->time_stamp;
                         }
@@ -76,6 +77,7 @@ struct FixedModel_Renderer : public ClientRenderer {
         }
         std::mutex mtx;
 
+        double L;
         std::string label;
         FixedModel *model;
         ModelStats stats;       // accessed via a background thread
@@ -304,6 +306,10 @@ void FixedModel_Renderer::render()
 
         const std::string wrong_label_text = "Incorrect:  " + std::to_string(stats.num_incorrect);
         render_text(wrong_label_text.c_str(), 24, 250, 400, PIXEL_OFFSET);
+
+
+        const std::string guess_label_text = "L:  " + std::to_string(L);
+        render_text(guess_label_text.c_str(), 24, 250, 425, PIXEL_OFFSET);
 }
 
 

@@ -16,7 +16,7 @@ struct FixedModel {
         void learn(const TrainingData *data);
         void predict(const Data *data, std::vector<int> &guesses);
         int predict_one(const Data *data, int selector);
-        void eval(const TrainingData *data, ModelStats &stats);
+        double eval(const TrainingData *data, ModelStats &stats);
 
         std::mutex mtx;
         std::chrono::_V2::system_clock::time_point  time_stamp;     // time stamp for last time model was updated
