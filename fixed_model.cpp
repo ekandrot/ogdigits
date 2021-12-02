@@ -75,7 +75,7 @@ void vect_add(float *output, const std::vector<float> &input)
 // matrix is M rows by N columns
 // input is M long
 // output is N long
-void matmul(const float *input, float *output, float *matrix, int M, int N)
+void matmul(const float *input, float *output, const float *matrix, int M, int N)
 {
         for (int j=0; j<N; ++j) {
                 float value{0};
@@ -92,6 +92,39 @@ void init_vector(std::vector<float> &m)
                 m[i] = (rand() / (double)RAND_MAX) * 2 - 1;
         }
 }
+
+//-------------------------------------------------------------------------------------------
+
+// !!! assumes data is locked or local copy outside of this block !!!
+//  private, internal only function for the above reason(s)
+static void predict_one_core(const Data *data, int index,
+        const std::vector<float> &W1,
+        const std::vector<float> &W2,
+        const std::vector<float> &W3,
+        const std::vector<float> &b1,
+        const std::vector<float> &b2,
+        const std::vector<float> &b3,
+        float *output
+        )
+{
+        const int num_features = data->num_features;
+
+        const float *example = data->row(index);
+        float hidden1[25];
+        matmul(example, hidden1, W1.data(), num_features, 25);
+        vect_add(hidden1, b1);
+        activation(hidden1, 25);
+
+        float hidden2[25];
+        matmul(hidden1, hidden2, W2.data(), 25, 25);
+        vect_add(hidden2, b2);
+        activation(hidden2, 25);
+
+        matmul(hidden2, output, W3.data(), 25, 10);
+        vect_add(output, b3);
+}
+
+
 
 //-------------------------------------------------------------------------------------------
 
@@ -120,7 +153,23 @@ FixedModel::FixedModel(int _num_features) : num_features(_num_features), last_tr
 
 void FixedModel::learn(const TrainingData *data)
 {
-        std::lock_guard<std::mutex> lck(mtx);
+        // only one learner, since the data is updated at the end
+        std::lock_guard<std::mutex> lck(learning_mtx);
+
+        // since we only lock around the model object's data read/write, we need a function lock above
+        std::unique_lock<std::mutex> lock(mtx);
+
+        // make local copies so that others can acquire the lock on the main model data
+        std::vector<float> W1(layer1);
+        std::vector<float> W2(layer2);
+        std::vector<float> W3(layer_out);
+
+        std::vector<float> b_hidden1_local(b_hidden1);
+        std::vector<float> b_hidden2_local(b_hidden2);
+        std::vector<float> b_output_local(b_output);
+
+        lock.unlock();
+
 
         auto start_time = now();
 
@@ -133,19 +182,19 @@ void FixedModel::learn(const TrainingData *data)
                 const float *example = data->row(r);
                 float hidden1[25];
                 float z1[25];
-                matmul(example, z1, layer1.data(), num_features, 25);
-                vect_add(z1, b_hidden1);
+                matmul(example, z1, W1.data(), num_features, 25);
+                vect_add(z1, b_hidden1_local);
                 activation(hidden1, z1, 25);
 
                 float hidden2[25];
                 float z2[25];
-                matmul(hidden1, z2, layer2.data(), 25, 25);
-                vect_add(z2, b_hidden2);
+                matmul(hidden1, z2, W2.data(), 25, 25);
+                vect_add(z2, b_hidden2_local);
                 activation(hidden2, z2, 25);
 
                 float output[10];
-                matmul(hidden2, output, layer_out.data(), 25, 10);
-                vect_add(output, b_output);
+                matmul(hidden2, output, W3.data(), 25, 10);
+                vect_add(output, b_output_local);
                 softmax(output, 10);
 
 
@@ -155,37 +204,56 @@ void FixedModel::learn(const TrainingData *data)
                 for (int j=0; j<25; ++j) {
                         for (int i=0; i<25; ++i) {
                                 for (int k=0; k<10; ++k) {
-                                        layer2[i + j*25] += (t[k] - output[k]) * layer_out[j + k*25] * (1 - hidden2[j]*hidden2[j]) * hidden1[i] * learn_rate * 0.01;
+                                        layer2[i + j*25] += (t[k] - output[k]) * W3[j + k*25] * (1 - hidden2[j]*hidden2[j]) * hidden1[i] * learn_rate * 0.1;
                                 }
                         }
                 }
 
                 for (int j=0; j<10; ++j) {
                         for (int i=0; i<25; ++i) {
-                                layer_out[i + j*25] += (t[j] - output[j]) * hidden2[i] * learn_rate;
+                                W3[i + j*25] += (t[j] - output[j]) * hidden2[i] * learn_rate;
                         }
-                        b_output[j] += (t[j] - output[j]) * learn_rate;
+                        b_output_local[j] += (t[j] - output[j]) * learn_rate;
                 }
+        }
+        ++epoch;
+
+        // update the main data from what we've learned
+        {
+                std::lock_guard<std::mutex> lck(mtx);
+
+                layer1 = W1;
+                layer2 = W2;
+                layer_out = W3;
+
+                b_hidden1 = b_hidden1_local;
+                b_hidden2 = b_hidden2_local;
+                b_output = b_output_local;
         }
 
         auto end_time = now();
         last_training_time_ms = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         time_stamp = now();
-
-        // for (int j=0; j<25; ++j) {
-        //         for (int i=0; i<25; ++i) {
-        //                 std::cout << layer2[i + j*25] << ", ";
-        //         }
-        //         std::cout << std::endl;
-        // }
-
-        ++epoch;
 }
 
+
+// this function can take a second or so, so maybe copy the data locally inside of a lock?
 double FixedModel::eval(const TrainingData *data, ModelStats &stats)
 {
-        std::lock_guard<std::mutex> lck(mtx);
-        
+        // since we only lock around the model object's data read/write, we need a function lock above
+        std::unique_lock<std::mutex> lock(mtx);
+
+        // make local copies so that others can acquire the lock on the main model data
+        std::vector<float> W1(layer1);
+        std::vector<float> W2(layer2);
+        std::vector<float> W3(layer_out);
+
+        std::vector<float> b1(b_hidden1);
+        std::vector<float> b2(b_hidden2);
+        std::vector<float> b3(b_output);
+
+        lock.unlock();
+
         auto start_time = now();
 
         const int num_features = data->num_features;
@@ -197,20 +265,8 @@ double FixedModel::eval(const TrainingData *data, ModelStats &stats)
         double L{0};
 
         for (int r=0; r<num_examples; ++r) {
-                const float *example = data->row(r);
-                float hidden1[25];
-                matmul(example, hidden1, layer1.data(), num_features, 25);
-                vect_add(hidden1, b_hidden1);
-                activation(hidden1, 25);
-
-                float hidden2[25];
-                matmul(hidden1, hidden2, layer2.data(), 25, 25);
-                vect_add(hidden2, b_hidden2);
-                activation(hidden2, 25);
-
                 float output[10];
-                matmul(hidden2, output, layer_out.data(), 25, 10);
-                vect_add(output, b_output);
+                predict_one_core(data, r, W1, W2, W3, b1, b2, b3, output);
                 softmax(output, 10);
                 int ans = max_index(output, 10);
 
@@ -229,33 +285,19 @@ double FixedModel::eval(const TrainingData *data, ModelStats &stats)
         return L / num_examples;
 }
 
+// this function should be very fast, so any data locks shouldn't block real work noticable
 int FixedModel::predict_one(const Data *data, int selector)
 {
-        std::unique_lock<std::mutex> lock(mtx, std::try_to_lock);
-        if (lock.owns_lock()) {
-                const int num_features = data->num_features;
-                const int num_examples = data->num_examples;
+        std::lock_guard<std::mutex> lck(mtx);
 
-                const float *example = data->row(selector);
-                float hidden1[25];
-                matmul(example, hidden1, layer1.data(), num_features, 25);
-                activation(hidden1, 25);
+        float output[10];
+        predict_one_core(data, selector, layer1, layer2, layer_out, b_hidden1, b_hidden2, b_output, output);
+        int ans = max_index(output, 10);
 
-                float hidden2[25];
-                matmul(hidden1, hidden2, layer2.data(), 25, 25);
-                activation(hidden2, 25);
-
-                float output[10];
-                matmul(hidden2, output, layer_out.data(), 25, 10);
-                // softmax(output, 10);
-                int ans = max_index(output, 10);
-
-                return ans;
-        }
-
-        return -1;
+        return ans;
 }
 
+// this function can take a second or so, so maybe copy the data locally inside of a lock?
 void FixedModel::predict(const Data *data, std::vector<int> &guesses)
 {
 

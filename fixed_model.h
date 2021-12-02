@@ -18,6 +18,7 @@ struct FixedModel {
         double eval(const TrainingData *data, ModelStats &stats);
 
         std::mutex mtx;
+        std::mutex learning_mtx;                // only one call into learn should ever been running (it can spawn multithread)
         std::chrono::_V2::system_clock::time_point  time_stamp;     // time stamp for last time model was updated
 
         std::vector<float> layer1;          // input to hidden 1
@@ -33,6 +34,9 @@ struct FixedModel {
         // stats during learning
         int16_t last_training_time_ms;
         int epoch;
+
+// private:
+//         void predict_one_core();
 };
 
 //-------------------------------------------------------------------------------------------

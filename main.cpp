@@ -21,7 +21,7 @@
 #include "ogmain.h"
 
 
-const int data_update_interval = 1;
+const int data_update_interval = 5;
 
 //-------------------------------------------------------------------------------------------
 
@@ -108,7 +108,7 @@ void Panel::render()
         dataset_displayed->render();
         model_displayed->render();
 
-        int guess = model_displayed->model->predict_one(training_dataset, dataset_displayed->displayed_index);
+        int guess = model_displayed->model->predict_one(dataset_displayed, dataset_displayed->displayed_index);
 
         if (guess >= 0) {
                 lastest_guess = guess;
@@ -160,6 +160,14 @@ void client_scroll_callback(GLFWwindow* window, double xoffset, double yoffset, 
 
 //-------------------------------------------------------------------------------------------
 
+void learn_thread_launcher()
+{
+        for (int i=0; i<100; ++i) {
+                std::thread t = std::thread(&FixedModel::learn, panel->model_displayed->model, panel->training_dataset);
+                t.join();
+        }
+}
+
 bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action, int mods, ClientRenderer *renderer)
 {
         Data_Renderer *data = panel->dataset_displayed;
@@ -190,8 +198,7 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
         }
 
         if (key == GLFW_KEY_T && action == GLFW_PRESS) {
-                // for (int i=0; i<100; ++i)
-                        std::thread(&FixedModel::learn, panel->model_displayed->model, panel->training_dataset).detach();
+                std::thread(learn_thread_launcher).detach();
                 return true;
         }
 
