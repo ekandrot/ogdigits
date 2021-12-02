@@ -64,6 +64,14 @@ int max_index(float *x, int len)
         return max_index;
 }
 
+
+void vect_add(float *output, const std::vector<float> &input)
+{
+        for (int i=0; i<input.size(); ++i) {
+                output[i] += input[i];
+        }
+}
+
 // matrix is M rows by N columns
 // input is M long
 // output is N long
@@ -78,7 +86,7 @@ void matmul(const float *input, float *output, float *matrix, int M, int N)
         }
 }
 
-void init_matrix(std::vector<float> &m)
+void init_vector(std::vector<float> &m)
 {
         for (int i=0; i<m.size(); ++i) {
                 m[i] = (rand() / (double)RAND_MAX) * 2 - 1;
@@ -93,9 +101,17 @@ FixedModel::FixedModel(int _num_features) : num_features(_num_features), last_tr
         layer2.resize(25 * 25);
         layer_out.resize(25 * 10);
 
-        init_matrix(layer1);
-        init_matrix(layer2);
-        init_matrix(layer_out);
+        b_hidden1.resize(25);
+        b_hidden2.resize(25);
+        b_output.resize(10);
+
+        init_vector(layer1);
+        init_vector(layer2);
+        init_vector(layer_out);
+
+        init_vector(b_hidden1);
+        init_vector(b_hidden2);
+        init_vector(b_output);
 
         epoch = 0;
 
@@ -118,15 +134,18 @@ void FixedModel::learn(const TrainingData *data)
                 float hidden1[25];
                 float z1[25];
                 matmul(example, z1, layer1.data(), num_features, 25);
+                vect_add(z1, b_hidden1);
                 activation(hidden1, z1, 25);
 
                 float hidden2[25];
                 float z2[25];
                 matmul(hidden1, z2, layer2.data(), 25, 25);
+                vect_add(z2, b_hidden2);
                 activation(hidden2, z2, 25);
 
                 float output[10];
                 matmul(hidden2, output, layer_out.data(), 25, 10);
+                vect_add(output, b_output);
                 softmax(output, 10);
 
 
@@ -136,9 +155,7 @@ void FixedModel::learn(const TrainingData *data)
                 for (int j=0; j<25; ++j) {
                         for (int i=0; i<25; ++i) {
                                 for (int k=0; k<10; ++k) {
-                                        // if (hidden2[j] > 0)
-                                        // layer2[i + j*25] += (t[k] - output[k]) * layer_out[j + k*25] * hidden1[i] * learn_rate * 0.01;
-                                        layer2[i + j*25] += (t[k] - output[k]) * layer_out[j + k*25] * (1 - z2[j]*z2[j]) * hidden1[i] * learn_rate * 0.01;
+                                        layer2[i + j*25] += (t[k] - output[k]) * layer_out[j + k*25] * (1 - hidden2[j]*hidden2[j]) * hidden1[i] * learn_rate * 0.01;
                                 }
                         }
                 }
@@ -147,6 +164,7 @@ void FixedModel::learn(const TrainingData *data)
                         for (int i=0; i<25; ++i) {
                                 layer_out[i + j*25] += (t[j] - output[j]) * hidden2[i] * learn_rate;
                         }
+                        b_output[j] += (t[j] - output[j]) * learn_rate;
                 }
         }
 
@@ -168,8 +186,6 @@ double FixedModel::eval(const TrainingData *data, ModelStats &stats)
 {
         std::lock_guard<std::mutex> lck(mtx);
         
-        const float learn_rate = 0.001;
-
         auto start_time = now();
 
         const int num_features = data->num_features;
@@ -184,14 +200,17 @@ double FixedModel::eval(const TrainingData *data, ModelStats &stats)
                 const float *example = data->row(r);
                 float hidden1[25];
                 matmul(example, hidden1, layer1.data(), num_features, 25);
+                vect_add(hidden1, b_hidden1);
                 activation(hidden1, 25);
 
                 float hidden2[25];
                 matmul(hidden1, hidden2, layer2.data(), 25, 25);
+                vect_add(hidden2, b_hidden2);
                 activation(hidden2, 25);
 
                 float output[10];
                 matmul(hidden2, output, layer_out.data(), 25, 10);
+                vect_add(output, b_output);
                 softmax(output, 10);
                 int ans = max_index(output, 10);
 
@@ -207,7 +226,7 @@ double FixedModel::eval(const TrainingData *data, ModelStats &stats)
         auto end_time = now();
         stats.execution_time = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
 
-        return L;
+        return L / num_examples;
 }
 
 int FixedModel::predict_one(const Data *data, int selector)

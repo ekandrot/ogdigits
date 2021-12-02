@@ -24,6 +24,10 @@ struct FixedModel {
         std::vector<float> layer2;          // layer 1 to layer 2
         std::vector<float> layer_out;       // layer 2 to output
 
+        std::vector<float> b_hidden1;           // values added to hidden1 after matmul
+        std::vector<float> b_hidden2;           // values added to hidden2 after matmul
+        std::vector<float> b_output;            // values added to output after matmul
+
         int num_features;
 
         // stats during learning

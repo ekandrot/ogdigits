@@ -190,7 +190,8 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
         }
 
         if (key == GLFW_KEY_T && action == GLFW_PRESS) {
-                std::thread(&FixedModel::learn, panel->model_displayed->model, panel->training_dataset).detach();
+                // for (int i=0; i<100; ++i)
+                        std::thread(&FixedModel::learn, panel->model_displayed->model, panel->training_dataset).detach();
                 return true;
         }
 
