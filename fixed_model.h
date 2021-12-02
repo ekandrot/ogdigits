@@ -11,7 +11,6 @@
 
 struct FixedModel {
         FixedModel(int num_features);
-        ~FixedModel();
 
         void learn(const TrainingData *data);
         void predict(const Data *data, std::vector<int> &guesses);
@@ -21,9 +20,9 @@ struct FixedModel {
         std::mutex mtx;
         std::chrono::_V2::system_clock::time_point  time_stamp;     // time stamp for last time model was updated
 
-        float* layer1;          // input to hidden 1
-        float* layer2;          // layer 1 to layer 2
-        float* layer_out;       // layer 2 to output
+        std::vector<float> layer1;          // input to hidden 1
+        std::vector<float> layer2;          // layer 1 to layer 2
+        std::vector<float> layer_out;       // layer 2 to output
 
         int num_features;
 

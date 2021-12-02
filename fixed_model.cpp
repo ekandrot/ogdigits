@@ -78,9 +78,9 @@ void matmul(const float *input, float *output, float *matrix, int M, int N)
         }
 }
 
-void init_matrix(float *m, int values)
+void init_matrix(std::vector<float> &m)
 {
-        for (int i=0; i<values; ++i) {
+        for (int i=0; i<m.size(); ++i) {
                 m[i] = (rand() / (double)RAND_MAX) * 2 - 1;
         }
 }
@@ -89,26 +89,18 @@ void init_matrix(float *m, int values)
 
 FixedModel::FixedModel(int _num_features) : num_features(_num_features), last_training_time_ms(0)
 {
-        layer1 = new float[num_features * 25];
-        layer2 = new float[25 * 25];
-        layer_out = new float[25 * 10];
+        layer1.resize(num_features * 25);
+        layer2.resize(25 * 25);
+        layer_out.resize(25 * 10);
 
-        init_matrix(layer1, num_features * 25);
-        init_matrix(layer2, 25 * 25);
-        init_matrix(layer_out, 25 * 10);
+        init_matrix(layer1);
+        init_matrix(layer2);
+        init_matrix(layer_out);
 
         epoch = 0;
 
         time_stamp = now();
 }
-
-FixedModel::~FixedModel()
-{
-        delete [] layer1;
-        delete [] layer2;
-        delete [] layer_out;
-}
-
 
 void FixedModel::learn(const TrainingData *data)
 {
@@ -125,16 +117,16 @@ void FixedModel::learn(const TrainingData *data)
                 const float *example = data->row(r);
                 float hidden1[25];
                 float z1[25];
-                matmul(example, z1, layer1, num_features, 25);
+                matmul(example, z1, layer1.data(), num_features, 25);
                 activation(hidden1, z1, 25);
 
                 float hidden2[25];
                 float z2[25];
-                matmul(hidden1, z2, layer2, 25, 25);
+                matmul(hidden1, z2, layer2.data(), 25, 25);
                 activation(hidden2, z2, 25);
 
                 float output[10];
-                matmul(hidden2, output, layer_out, 25, 10);
+                matmul(hidden2, output, layer_out.data(), 25, 10);
                 softmax(output, 10);
 
 
@@ -191,15 +183,15 @@ double FixedModel::eval(const TrainingData *data, ModelStats &stats)
         for (int r=0; r<num_examples; ++r) {
                 const float *example = data->row(r);
                 float hidden1[25];
-                matmul(example, hidden1, layer1, num_features, 25);
+                matmul(example, hidden1, layer1.data(), num_features, 25);
                 activation(hidden1, 25);
 
                 float hidden2[25];
-                matmul(hidden1, hidden2, layer2, 25, 25);
+                matmul(hidden1, hidden2, layer2.data(), 25, 25);
                 activation(hidden2, 25);
 
                 float output[10];
-                matmul(hidden2, output, layer_out, 25, 10);
+                matmul(hidden2, output, layer_out.data(), 25, 10);
                 softmax(output, 10);
                 int ans = max_index(output, 10);
 
@@ -227,15 +219,15 @@ int FixedModel::predict_one(const Data *data, int selector)
 
                 const float *example = data->row(selector);
                 float hidden1[25];
-                matmul(example, hidden1, layer1, num_features, 25);
+                matmul(example, hidden1, layer1.data(), num_features, 25);
                 activation(hidden1, 25);
 
                 float hidden2[25];
-                matmul(hidden1, hidden2, layer2, 25, 25);
+                matmul(hidden1, hidden2, layer2.data(), 25, 25);
                 activation(hidden2, 25);
 
                 float output[10];
-                matmul(hidden2, output, layer_out, 25, 10);
+                matmul(hidden2, output, layer_out.data(), 25, 10);
                 // softmax(output, 10);
                 int ans = max_index(output, 10);
 
@@ -249,7 +241,7 @@ void FixedModel::predict(const Data *data, std::vector<int> &guesses)
 {
 
         return;
-
+/*
 
         std::lock_guard<std::mutex> lck(mtx);
 
@@ -259,20 +251,21 @@ void FixedModel::predict(const Data *data, std::vector<int> &guesses)
         for (int r=0; r<num_examples; ++r) {
                 const float *example = data->row(r);
                 float hidden1[25];
-                matmul(example, hidden1, layer1, num_features, 25);
+                matmul(example, hidden1, layer1.data(), num_features, 25);
                 activation(hidden1, 25);
 
                 float hidden2[25];
-                matmul(hidden1, hidden2, layer2, 25, 25);
+                matmul(hidden1, hidden2, layer2.data(), 25, 25);
                 activation(hidden2, 25);
 
                 float output[10];
-                matmul(hidden2, output, layer_out, 25, 10);
+                matmul(hidden2, output, layer_out.data(), 25, 10);
                 // softmax(output, 10);
                 int ans = max_index(output, 10);
 
                 guesses[r] = ans;
         }
+*/
 }
 
 //-------------------------------------------------------------------------------------------
