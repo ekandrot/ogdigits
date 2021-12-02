@@ -295,21 +295,24 @@ void FixedModel_Renderer::render()
         const std::string label_text = "Model Used:  " + label;
         render_text(label_text.c_str(), 24, 250, 300, PIXEL_OFFSET);
 
+        const std::string epoch_label_text = "Epoch:  " + std::to_string(model->epoch);
+        render_text(epoch_label_text.c_str(), 24, 250, 325, PIXEL_OFFSET);
+
         const std::string last_time_label_text = "How long to process:  " + std::to_string(model->last_training_time_ms) + " ms";
-        render_text(last_time_label_text.c_str(), 24, 250, 325, PIXEL_OFFSET);
+        render_text(last_time_label_text.c_str(), 24, 250, 350, PIXEL_OFFSET);
 
         const std::string timing_label_text = "Eval time:  " + std::to_string(stats.execution_time) + " ms";
-        render_text(timing_label_text.c_str(), 24, 250, 350, PIXEL_OFFSET);
+        render_text(timing_label_text.c_str(), 24, 250, 375, PIXEL_OFFSET);
 
         const std::string correcct_label_text = "Correct:  " + std::to_string(stats.num_correct);
-        render_text(correcct_label_text.c_str(), 24, 250, 375, PIXEL_OFFSET);
+        render_text(correcct_label_text.c_str(), 24, 250, 400, PIXEL_OFFSET);
 
         const std::string wrong_label_text = "Incorrect:  " + std::to_string(stats.num_incorrect);
-        render_text(wrong_label_text.c_str(), 24, 250, 400, PIXEL_OFFSET);
+        render_text(wrong_label_text.c_str(), 24, 250, 425, PIXEL_OFFSET);
 
 
         const std::string guess_label_text = "L:  " + std::to_string(L);
-        render_text(guess_label_text.c_str(), 24, 250, 425, PIXEL_OFFSET);
+        render_text(guess_label_text.c_str(), 24, 250, 450, PIXEL_OFFSET);
 }
 
 

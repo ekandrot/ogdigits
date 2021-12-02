@@ -21,6 +21,24 @@ void activation(float *x, int len)
         }
 }
 
+void relu(float *h, const float *z, int len)
+{
+        for (int i=0; i<len; ++i) {
+                if (z[i] < 0) {
+                        h[i] = 0;
+                } else {
+                        h[i] = z[i];
+                }
+        }
+}
+
+void relu(float *x, int len)
+{
+        for (int i=0; i<len; ++i) {
+                if (x[i] < 0) x[i] = 0;
+        }
+}
+
 void softmax(float *x, int len)
 {
         float sum{0};
@@ -79,6 +97,8 @@ FixedModel::FixedModel(int _num_features) : num_features(_num_features), last_tr
         init_matrix(layer2, 25 * 25);
         init_matrix(layer_out, 25 * 10);
 
+        epoch = 0;
+
         time_stamp = now();
 }
 
@@ -94,12 +114,12 @@ void FixedModel::learn(const TrainingData *data)
 {
         std::lock_guard<std::mutex> lck(mtx);
 
-        const float learn_rate = 1e-3;
-
         auto start_time = now();
 
         const int num_features = data->num_features;
         const int num_examples = data->num_examples;
+
+        const float learn_rate = 1.0/num_examples;
 
         for (int r=0; r<num_examples; ++r) {
                 const float *example = data->row(r);
@@ -124,7 +144,9 @@ void FixedModel::learn(const TrainingData *data)
                 for (int j=0; j<25; ++j) {
                         for (int i=0; i<25; ++i) {
                                 for (int k=0; k<10; ++k) {
-                                        layer2[i + j*25] += (t[k] - output[k]) * layer_out[j + k*25] * (1 - z2[j]*z2[j]) * hidden1[i] * learn_rate * 1e-3;
+                                        // if (hidden2[j] > 0)
+                                        // layer2[i + j*25] += (t[k] - output[k]) * layer_out[j + k*25] * hidden1[i] * learn_rate * 0.01;
+                                        layer2[i + j*25] += (t[k] - output[k]) * layer_out[j + k*25] * (1 - z2[j]*z2[j]) * hidden1[i] * learn_rate * 0.01;
                                 }
                         }
                 }
@@ -140,13 +162,14 @@ void FixedModel::learn(const TrainingData *data)
         last_training_time_ms = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         time_stamp = now();
 
-        for (int j=0; j<25; ++j) {
-                for (int i=0; i<25; ++i) {
-                        std::cout << layer2[i + j*25] << ", ";
-                }
-                std::cout << std::endl;
-        }
+        // for (int j=0; j<25; ++j) {
+        //         for (int i=0; i<25; ++i) {
+        //                 std::cout << layer2[i + j*25] << ", ";
+        //         }
+        //         std::cout << std::endl;
+        // }
 
+        ++epoch;
 }
 
 double FixedModel::eval(const TrainingData *data, ModelStats &stats)
@@ -224,6 +247,10 @@ int FixedModel::predict_one(const Data *data, int selector)
 
 void FixedModel::predict(const Data *data, std::vector<int> &guesses)
 {
+
+        return;
+
+
         std::lock_guard<std::mutex> lck(mtx);
 
         const int num_features = data->num_features;

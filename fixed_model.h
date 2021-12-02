@@ -29,6 +29,7 @@ struct FixedModel {
 
         // stats during learning
         int16_t last_training_time_ms;
+        int epoch;
 };
 
 //-------------------------------------------------------------------------------------------
