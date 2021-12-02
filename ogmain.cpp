@@ -31,7 +31,7 @@ circle_obj *circle_32;
 
 
 ClientRenderer *client_renderer;
-int client_update_interval{-1};
+int client_update_interval{1};
 
 //------------------------------------------------------------------------------
 
@@ -523,7 +523,7 @@ int og_main(ClientRenderer *renderer)
         glfwSetKeyCallback(window, key_callback);
         glfwSetWindowPosCallback(window, window_moved_callback);
         glfwSetScrollCallback(window, scroll_callback);
-        glfwSwapInterval(0);
+        glfwSwapInterval(1);
 
         double last_time = glfwGetTime();
         double xpos_prev, ypos_prev;
@@ -555,7 +555,6 @@ int og_main(ClientRenderer *renderer)
                 if (refresh_needed) {
                         refresh_needed = false;
                         ++redraw_count;
-                        // std::cout << "redraw " << redraw_count << '\n';
 
                         if (gWindowWasResized) {
                                 gWindowWasResized = false;
@@ -574,8 +573,7 @@ int og_main(ClientRenderer *renderer)
                         render_scene();
                         glfwSwapBuffers(window);
                 }
-
-		glfwPollEvents();
+		glfwWaitEventsTimeout(client_update_interval);
         }
 
         write_prefs_file(PREFS_FILE_NAME);
