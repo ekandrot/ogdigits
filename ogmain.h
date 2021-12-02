@@ -29,8 +29,6 @@ extern void init_client_og();
 extern int og_main(ClientRenderer *renderer);
 extern void render_help();
 
-// void set_client_renderer(ClientRenderer *renderer);
-
 /*
         -1 seconds is initial value, which is never
         used to gather update data for display, slow background operations, like evaluating a model

@@ -21,7 +21,7 @@
 #include "ogmain.h"
 
 
-const int data_update_interval = 2;
+const int data_update_interval = 1;
 
 //-------------------------------------------------------------------------------------------
 
@@ -37,22 +37,10 @@ struct Data_Renderer : public virtual Data, ClientRenderer {
 
         int64_t time_to_load;
         int displayed_index;    // which example is to be displayed
-        int lastest_guess;
 };
 
 struct TrainingData_Renderer : public TrainingData, public Data_Renderer {
-        TrainingData_Renderer() {
-                stats.execution_time = 0;
-                stats.num_correct = 0;
-                stats.num_incorrect = 0;
-        }
-
-
         void render() override;
-        void data_update() override;    // called via a background thread
-
-        ModelStats stats;       // accessed via a background thread - ???  does it need a lock?
-        std::chrono::_V2::system_clock::time_point last_model_stats_time_stamp;
 };
 
 struct TestingData_Renderer : public TestingData, public Data_Renderer {
@@ -60,31 +48,81 @@ struct TestingData_Renderer : public TestingData, public Data_Renderer {
 };
 
 
-std::vector<int> guesses_training;
-std::vector<int> guesses_testing;
+struct FixedModel_Renderer : public ClientRenderer {
+        FixedModel_Renderer(FixedModel *_model) : model(_model)
+        {
+                stats.execution_time = 0;
+                stats.num_correct = 0;
+                stats.num_incorrect = 0;
 
-std::vector<int> *guesses = &guesses_training;
+                label = "Fixed Model";
+        }
 
-FixedModel *model;
+        void render() override;
+
+            // called via a background thread
+        void data_eval(TrainingData *data)
+        {
+                // see if there is already a thread waiting to eval
+                std::unique_lock<std::mutex> lock(mtx, std::try_to_lock);
+                if (lock.owns_lock()) {
+                        if (last_model_stats_time_stamp < model->time_stamp) {
+                                ModelStats local_stats;
+                                model->eval(data, local_stats); // will block waiting its turn
+                                stats = local_stats;
+                                last_model_stats_time_stamp = model->time_stamp;
+                        }
+                }
+        }
+        std::mutex mtx;
+
+        std::string label;
+        FixedModel *model;
+        ModelStats stats;       // accessed via a background thread
+        std::chrono::_V2::system_clock::time_point last_model_stats_time_stamp;
+};
+
 
 
 struct Panel : ClientRenderer {
         void render() override;
+        void data_update() override;    // called via a background thread
 
         void set_display_training() { dataset_displayed = training_dataset; }
         void set_display_testing() { dataset_displayed = testing_dataset; }
 
         Data_Renderer *dataset_displayed;
+        FixedModel_Renderer *model_displayed;
 
         TrainingData_Renderer *training_dataset;
         TestingData_Renderer *testing_dataset;
+
+        int lastest_guess;
 };
 
 
 void Panel::render()
 {
         dataset_displayed->render();
+        model_displayed->render();
+
+        int guess = model_displayed->model->predict_one(training_dataset, dataset_displayed->displayed_index);
+
+        if (guess >= 0) {
+                lastest_guess = guess;
+        }
+        const std::string guess_label_text = "What it could be:  " + std::to_string(lastest_guess);
+        render_text(guess_label_text.c_str(), 24, 250, 275, PIXEL_OFFSET);
+
 }
+
+// called in its own thread
+void Panel::data_update()
+{
+        // std::thread(&FixedModel_Renderer::data_eval, model_displayed, training_dataset).detach();
+        model_displayed->data_eval(training_dataset);
+}
+
 
 Panel *panel;
 
@@ -150,7 +188,7 @@ bool selection_key_handler(GLFWwindow* window, int key, int scancode, int action
         }
 
         if (key == GLFW_KEY_T && action == GLFW_PRESS) {
-                // std::thread(&FixedModel::learn, model, training_dataset).detach();
+                std::thread(&FixedModel::learn, panel->model_displayed->model, panel->training_dataset).detach();
                 return true;
         }
 
@@ -233,36 +271,8 @@ void Data_Renderer::render()
         const std::string load_time_label_text = "How long to load:  " + std::to_string(time_to_load) + " ms";
         render_text(load_time_label_text.c_str(), 24, 250, 100, PIXEL_OFFSET);
 
-
-
-
         const std::string pos_label_text = "Where it's at:  " + std::to_string(displayed_index);
         render_text(pos_label_text.c_str(), 24, 10, 250, PIXEL_OFFSET);
-
-        // display model info, internals, output, and guess(es)
-
-        int guess = model->predict_one(this, displayed_index);
-
-        if (guess >= 0) {
-                lastest_guess = guess;
-        }
-        const std::string guess_label_text = "What it could be:  " + std::to_string(lastest_guess);
-        // const std::string guess_label_text = "What it could be:  " + std::to_string((*guesses)[displayed_index]);
-        render_text(guess_label_text.c_str(), 24, 250, 275, PIXEL_OFFSET);
-
-
-        const std::string timing_label_text = "How long to process:  " + std::to_string(model->last_training_time_ms) + " ms";
-        render_text(timing_label_text.c_str(), 24, 250, 300, PIXEL_OFFSET);
-
-
-        // const std::string timing_label_text = "Eval time:  " + std::to_string(stats.execution_time) + " ms";
-        // render_text(timing_label_text.c_str(), 24, 250, 325, PIXEL_OFFSET);
-
-        // const std::string correcct_label_text = "Correct:  " + std::to_string(stats.num_correct);
-        // render_text(correcct_label_text.c_str(), 24, 250, 350, PIXEL_OFFSET);
-
-        // const std::string wrong_label_text = "Incorrect:  " + std::to_string(stats.num_incorrect);
-        // render_text(wrong_label_text.c_str(), 24, 250, 375, PIXEL_OFFSET);
 }
 
 void TrainingData_Renderer::render()
@@ -278,17 +288,24 @@ void TestingData_Renderer::render()
         Data_Renderer::render();
 }
 
-
-void TrainingData_Renderer::data_update()
+void FixedModel_Renderer::render()
 {
-        if (last_model_stats_time_stamp < model->time_stamp) {
-                ModelStats local_stats;
-                model->eval(this, local_stats);
-                stats = local_stats;
-                last_model_stats_time_stamp = model->time_stamp;
-        }
+        const std::string label_text = "Model Used:  " + label;
+        render_text(label_text.c_str(), 24, 250, 300, PIXEL_OFFSET);
 
+        const std::string last_time_label_text = "How long to process:  " + std::to_string(model->last_training_time_ms) + " ms";
+        render_text(last_time_label_text.c_str(), 24, 250, 325, PIXEL_OFFSET);
+
+        const std::string timing_label_text = "Eval time:  " + std::to_string(stats.execution_time) + " ms";
+        render_text(timing_label_text.c_str(), 24, 250, 350, PIXEL_OFFSET);
+
+        const std::string correcct_label_text = "Correct:  " + std::to_string(stats.num_correct);
+        render_text(correcct_label_text.c_str(), 24, 250, 375, PIXEL_OFFSET);
+
+        const std::string wrong_label_text = "Incorrect:  " + std::to_string(stats.num_incorrect);
+        render_text(wrong_label_text.c_str(), 24, 250, 400, PIXEL_OFFSET);
 }
+
 
 //-------------------------------------------------------------------------------------------
 
@@ -311,15 +328,16 @@ int main()
         // unsigned int n = std::thread::hardware_concurrency();
         // std::cout << n << " concurrent threads are supported.\n";
 
-        TrainingData_Renderer training_data;
+        TrainingData_Renderer *training_data = new TrainingData_Renderer();
 
         auto start_time = now();
-        training_data.load_data(train_data_filename);
+        training_data->load_data(train_data_filename);
         auto end_time = now();
         auto total_time = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-        training_data.time_to_load = total_time;
+        training_data->time_to_load = total_time;
 
-        model = new FixedModel(training_data.num_features);
+        FixedModel *model = new FixedModel(training_data->num_features);
+        FixedModel_Renderer *model_renderer = new FixedModel_Renderer(model);
 
         TestingData_Renderer test_data;
 
@@ -330,9 +348,10 @@ int main()
         test_data.time_to_load = total_time;
 
         panel = new Panel();
-        panel->training_dataset = &training_data;
+        panel->training_dataset = training_data;
         panel->testing_dataset = &test_data;
         panel->set_display_training();
+        panel->model_displayed = model_renderer;
 
         return og_main(panel);
 }

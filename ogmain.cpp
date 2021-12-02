@@ -466,11 +466,6 @@ void init_opengl_objects()
 
 //-------------------------------------------------------------------------------------------
 
-// void set_client_renderer(ClientRenderer *renderer)
-// {
-//         client_renderer = renderer;
-// }
-
 int og_main(ClientRenderer *renderer)
 {
         client_renderer = renderer;
@@ -543,7 +538,7 @@ int og_main(ClientRenderer *renderer)
 	glClearColor(0.5f, 0.75f, 0.5f, 1.0f);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-        double last_client_called{0};
+        double last_client_called{-100};        // so it will call first pass through loop
         int redraw_count{0};
 	while (!glfwWindowShouldClose(window)) {
                 double current_time = glfwGetTime();
