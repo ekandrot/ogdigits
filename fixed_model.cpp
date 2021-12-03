@@ -1,6 +1,7 @@
-#include <math.h>
+#include <cmath>
 #include <iostream>
 #include <chrono>
+#include <thread>
 #include "fixed_model.h"
 
 //-------------------------------------------------------------------------------------------
@@ -151,11 +152,142 @@ FixedModel::FixedModel(int _num_features) : num_features(_num_features), last_tr
         time_stamp = now();
 }
 
+struct UpdateData {
+        std::vector<float> W1;
+        std::vector<float> W2;
+        std::vector<float> W3;
+
+        std::vector<float> b1;
+        std::vector<float> b2;
+        std::vector<float> b3;
+
+};
+
+
+void learn_thread(const TrainingData *data, int first, int last, UpdateData &update)
+{
+        const int num_features = data->num_features;
+        const int num_examples = data->num_examples;
+
+        const float learn_rate = 1.0/num_examples;
+
+        for (int r=first; r<last; ++r) {
+                const float *example = data->row(r);
+                float hidden1[25];
+                float z1[25];
+                matmul(example, z1, update.W1.data(), num_features, 25);
+                vect_add(z1, update.b1);
+                activation(hidden1, z1, 25);
+
+                float hidden2[25];
+                float z2[25];
+                matmul(hidden1, z2, update.W2.data(), 25, 25);
+                vect_add(z2, update.b2);
+                activation(hidden2, z2, 25);
+
+                float output[10];
+                matmul(hidden2, output, update.W3.data(), 25, 10);
+                vect_add(output, update.b3);
+                softmax(output, 10);
+
+                int t[10] = {0};
+                t[data->Y[r]] = 1;
+
+                for (int j=0; j<25; ++j) {
+                        for (int i=0; i<25; ++i) {
+                                for (int k=0; k<10; ++k) {
+                                        update.W2[i + j*25] += (t[k] - output[k]) * update.W3[j + k*25] * (1 - hidden2[j]*hidden2[j]) * hidden1[i] * learn_rate * 0.1;
+                                }
+                        }
+                }
+
+                for (int j=0; j<10; ++j) {
+                        for (int i=0; i<25; ++i) {
+                                update.W3[i + j*25] += (t[j] - output[j]) * hidden2[i] * learn_rate;
+                        }
+                        update.b3[j] += (t[j] - output[j]) * learn_rate;
+                }
+        }
+}
+
+
+void vec_sum(std::vector<float> &a, const std::vector<float> &b)
+{
+        for (int i=0; i<a.size(); ++i) {
+                a[i] += b[i];
+        }
+}
+
+void vec_div(std::vector<float> &a, float b)
+{
+        for (int i=0; i<a.size(); ++i) {
+                a[i] /= b;
+        }
+}
+
+
 void FixedModel::learn(const TrainingData *data)
 {
         // only one learner, since the data is updated at the end
         std::lock_guard<std::mutex> lck(learning_mtx);
+        auto start_time = now();
 
+        std::vector<std::thread> pool;
+        std::vector<UpdateData> updates(10);
+
+        UpdateData update;
+        update.W1 = layer1;
+        update.W2 = layer2;
+        update.W3 = layer_out;
+        update.b1 = b_hidden1;
+        update.b2 = b_hidden2;
+        update.b3 = b_output;
+
+        int amount_per_thread = data->num_examples / 10;
+        for (int i=0; i<10; ++i) {
+                updates[i] = update;
+                pool.push_back(std::thread(learn_thread, data, amount_per_thread * i, amount_per_thread * (i + 1), std::ref(updates[i])));
+        }
+
+        for (int i=0; i<10; ++i) {
+                pool[i].join();
+        }
+
+
+        // update the main data from what we've learned
+        {
+                std::lock_guard<std::mutex> lck(mtx);
+
+                layer1 = updates[0].W1;
+                layer2 = updates[0].W2;
+                layer_out = updates[0].W3;
+
+                b_hidden1 = updates[0].b1;
+                b_hidden2 = updates[0].b2;
+                b_output = updates[0].b3;
+
+                for (int i=1; i<10; ++i) {
+                        vec_sum(layer1, updates[i].W1);
+                        vec_sum(layer2, updates[i].W2);
+                        vec_sum(layer_out, updates[i].W3);
+
+                        vec_sum(b_hidden1, updates[i].b1);
+                        vec_sum(b_hidden2, updates[i].b2);
+                        vec_sum(b_output, updates[i].b3);
+                }
+
+                vec_div(layer1, 10);
+                vec_div(layer2, 10);
+                vec_div(layer_out, 10);
+
+                vec_div(b_hidden1, 10);
+                vec_div(b_hidden2, 10);
+                vec_div(b_output, 10);
+
+        }
+
+
+#if 0
         // since we only lock around the model object's data read/write, we need a function lock above
         std::unique_lock<std::mutex> lock(mtx);
 
@@ -204,7 +336,7 @@ void FixedModel::learn(const TrainingData *data)
                 for (int j=0; j<25; ++j) {
                         for (int i=0; i<25; ++i) {
                                 for (int k=0; k<10; ++k) {
-                                        layer2[i + j*25] += (t[k] - output[k]) * W3[j + k*25] * (1 - hidden2[j]*hidden2[j]) * hidden1[i] * learn_rate * 0.1;
+                                        W2[i + j*25] += (t[k] - output[k]) * W3[j + k*25] * (1 - hidden2[j]*hidden2[j]) * hidden1[i] * learn_rate * 0.1;
                                 }
                         }
                 }
@@ -216,20 +348,23 @@ void FixedModel::learn(const TrainingData *data)
                         b_output_local[j] += (t[j] - output[j]) * learn_rate;
                 }
         }
+
+
+#endif
         ++epoch;
 
-        // update the main data from what we've learned
-        {
-                std::lock_guard<std::mutex> lck(mtx);
+        // // update the main data from what we've learned
+        // {
+        //         std::lock_guard<std::mutex> lck(mtx);
 
-                layer1 = W1;
-                layer2 = W2;
-                layer_out = W3;
+        //         layer1 = W1;
+        //         layer2 = W2;
+        //         layer_out = W3;
 
-                b_hidden1 = b_hidden1_local;
-                b_hidden2 = b_hidden2_local;
-                b_output = b_output_local;
-        }
+        //         b_hidden1 = b_hidden1_local;
+        //         b_hidden2 = b_hidden2_local;
+        //         b_output = b_output_local;
+        // }
 
         auto end_time = now();
         last_training_time_ms = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();

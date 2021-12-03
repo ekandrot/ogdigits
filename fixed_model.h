@@ -9,10 +9,15 @@
 
 //-------------------------------------------------------------------------------------------
 
+//-------------------------------------------------------------------------------------------
+
 struct FixedModel {
         FixedModel(int num_features);
 
+        // can change the model
         void learn(const TrainingData *data);
+
+        // only read from model
         void predict(const Data *data, std::vector<int> &guesses);
         int predict_one(const Data *data, int selector);
         double eval(const TrainingData *data, ModelStats &stats);
@@ -36,7 +41,7 @@ struct FixedModel {
         int epoch;
 
 // private:
-//         void predict_one_core();
+//         void learn_thread(const TrainingData *data, int first, int last, UpdateData &update);
 };
 
 //-------------------------------------------------------------------------------------------
