@@ -1,62 +1,61 @@
-#include <cstdlib>
+#include "ImageLoader.h"
+
 #include <cstdio>
-#include <stdint.h>
 #include <stdarg.h>
+
+#include <exception>
+
 #include "jpeglib.h"
 #include <png.h>
 #include <cstring>
+#include <iostream>
 
-#include "image_loader.h"
+//-------------------------------------------------------------------------------------------
 
-#include <filesystem>
-namespace fs = std::filesystem;
-
-////////////////////////////////////////////////////////////////////////////
-
-void abort_(const char * s, ...) {
-    va_list args;
-    va_start(args, s);
-    vfprintf(stderr, s, args);
-    fprintf(stderr, "\n");
-    va_end(args);
-    exit(-1);
+static void abort_(const char * s, ...) {
+        va_list args;
+        va_start(args, s);
+        vfprintf(stderr, s, args);
+        fprintf(stderr, "\n");
+        va_end(args);
+        exit(-1);
 }
 
-int x, y;
 
-int width, height, stride;
-uint8_t *image_data;
-png_byte color_type;
-png_byte bit_depth;
+Image load_png(fs::path file_path)
+{
+        std::cout << file_path << std::endl;
 
-png_structp png_ptr;
-png_infop info_ptr;
-int number_of_passes;
-png_bytep * row_pointers;
+        Image image;
+        const char *file_name = file_path.c_str();
 
-
-void read_png_file(const char* file_name) {
-    char header[8];    // 8 is the maximum size that can be checked
-
-    /* open file and test for it being a png */
-    FILE *fp = fopen(file_name, "rb");
-    if (!fp)
-        abort_("[read_png_file] File %s could not be opened for reading", file_name);
-    size_t elementsRead = fread(header, 1, 8, fp);
-    if (elementsRead != 8) {
-        abort_("[read_png_file] File %s only read %ld bytes", file_name, elementsRead);
-    }
-    if (png_sig_cmp((const unsigned char*)header, 0, 8))
-        abort_("[read_png_file] File %s is not recognized as a PNG file", file_name);
+        char header[8];    // 8 is the maximum size that can be checked
+        /* open file and test for it being a png */
+        FILE *fp = fopen(file_name, "rb");
+        if (!fp) 
+        {
+                throw fs::filesystem_error("load_png failed to open", file_path, std::error_code());
+        }
+        size_t elementsRead = fread(header, 1, 8, fp);
+        if (elementsRead != 8) {
+                std::stringstream ss;
+                ss << "load_png, File " << file_name << " only read " << elementsRead << " bytes\n";
+                throw std::runtime_error(ss.str());
+        }
+        if (png_sig_cmp((const unsigned char*)header, 0, 8)) {
+                std::stringstream ss;
+                ss << "load_png, File " << file_name << " is not recognized as a PNG file\n";
+                throw std::runtime_error(ss.str());
+        }
 
 
         /* initialize stuff */
-    png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 
     if (!png_ptr)
         abort_("[read_png_file] png_create_read_struct failed");
 
-    info_ptr = png_create_info_struct(png_ptr);
+    png_infop info_ptr = png_create_info_struct(png_ptr);
     if (!info_ptr)
         abort_("[read_png_file] png_create_info_struct failed");
 
@@ -68,18 +67,18 @@ void read_png_file(const char* file_name) {
 
     png_read_info(png_ptr, info_ptr);
 
-    width = png_get_image_width(png_ptr, info_ptr);
-    height = png_get_image_height(png_ptr, info_ptr);
-    color_type = png_get_color_type(png_ptr, info_ptr);
-    bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+    image.width = png_get_image_width(png_ptr, info_ptr);
+    image.height = png_get_image_height(png_ptr, info_ptr);
+//     png_byte color_type = png_get_color_type(png_ptr, info_ptr);
+//     png_byte bit_depth = png_get_bit_depth(png_ptr, info_ptr);
 
-    png_byte channels = png_get_channels(png_ptr, info_ptr);
+//     png_byte channels = png_get_channels(png_ptr, info_ptr);
 
     // printf("color_type:  %d\n", color_type);
     // printf("bit_depth:  %d\n", bit_depth);
     // printf("channels:  %d\n", channels);
 
-    number_of_passes = png_set_interlace_handling(png_ptr);
+//     int number_of_passes = png_set_interlace_handling(png_ptr);
     png_read_update_info(png_ptr, info_ptr);
 
 
@@ -87,22 +86,22 @@ void read_png_file(const char* file_name) {
     if (setjmp(png_jmpbuf(png_ptr)))
         abort_("[read_png_file] Error during read_image");
 
-    stride = png_get_rowbytes(png_ptr,info_ptr);
-    image_data = (uint8_t*)malloc(stride * height);
+    image.stride = png_get_rowbytes(png_ptr,info_ptr);
+    image.data.resize(image.stride * image.height);
 
-    row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * height);
-    for (y=0; y<height; y++) {
-        row_pointers[y] = image_data + y * stride;
-    }
+        png_bytep * row_pointers = (png_bytep*) malloc(sizeof(png_bytep) * image.height);
+        for (int y=0; y<image.height; y++) {
+                row_pointers[y] = image.data.data() + y * image.stride;
+        }
+        png_read_image(png_ptr, row_pointers);
+        free(row_pointers);
 
-    png_read_image(png_ptr, row_pointers);
+        fclose(fp);
 
-    free(row_pointers);
-
-    fclose(fp);
+        return image;
 }
 
-////////////////////////////////////////////////////////////////////////////
+//-------------------------------------------------------------------------------------------
 
 struct my_error_mgr {
   struct jpeg_error_mgr pub;	/* "public" fields */
@@ -112,21 +111,28 @@ struct my_error_mgr {
 
 typedef struct my_error_mgr * my_error_ptr;
 
-void my_error_exit (j_common_ptr cinfo)
+static void my_error_exit (j_common_ptr cinfo)
 {
-  /* cinfo->err really points to a my_error_mgr struct, so coerce pointer */
-  my_error_ptr myerr = (my_error_ptr) cinfo->err;
+        /* cinfo->err really points to a my_error_mgr struct, so coerce pointer */
+        my_error_ptr myerr = (my_error_ptr) cinfo->err;
 
-  /* Always display the message. */
-  /* We could postpone this until after returning, if we chose. */
-  (*cinfo->err->output_message) (cinfo);
+        /* Always display the message. */
+        /* We could postpone this until after returning, if we chose. */
+        (*cinfo->err->output_message) (cinfo);
 
-  /* Return control to the setjmp point */
-  longjmp(myerr->setjmp_buffer, 1);
+        /* Return control to the setjmp point */
+        longjmp(myerr->setjmp_buffer, 1);
 }
 
+//-------------------------------------------------------------------------------------------
 
-int read_JPEG_file (const char * filename) {
+Image load_jpeg (fs::path file_path)
+{
+        Image image;
+
+        const char *filename = file_path.c_str();
+
+
   /* This struct contains the JPEG decompression parameters and pointers to
    * working space (which is allocated as needed by the JPEG library).
    */
@@ -147,10 +153,9 @@ int read_JPEG_file (const char * filename) {
    * requires it in order to read binary files.
    */
 
-  if ((infile = fopen(filename, "rb")) == NULL) {
-    fprintf(stderr, "can't open %s\n", filename);
-    return 0;
-  }
+        if ((infile = fopen(filename, "rb")) == NULL) {
+                throw fs::filesystem_error("load_jpeg failed to open XXX", file_path, std::error_code());
+        }
 
   /* Step 1: allocate and initialize JPEG decompression object */
 
@@ -164,7 +169,7 @@ int read_JPEG_file (const char * filename) {
      */
     jpeg_destroy_decompress(&cinfo);
     fclose(infile);
-    return 0;
+    throw std::runtime_error("load_jpeg, jmp happened");
   }
   /* Now we can initialize the JPEG decompression object. */
   jpeg_create_decompress(&cinfo);
@@ -213,10 +218,10 @@ int read_JPEG_file (const char * filename) {
   /* Here we use the library's state variable cinfo.output_scanline as the
    * loop counter, so that we don't have to keep track ourselves.
    */
-    height = cinfo.output_height;
-    width = cinfo.output_width;
-    stride = row_stride;
-    image_data = (uint8_t*)malloc(height * stride);
+    image.height = cinfo.output_height;
+    image.width = cinfo.output_width;
+    image.stride = row_stride;
+    image.data.resize(image.stride * image.height);
     while (cinfo.output_scanline < cinfo.output_height) {
         /* jpeg_read_scanlines expects an array of pointers to scanlines.
         * Here the array is only one element long, but you could ask for
@@ -224,7 +229,7 @@ int read_JPEG_file (const char * filename) {
          */
         (void) jpeg_read_scanlines(&cinfo, buffer, 1);
         /* Assume put_scanline_someplace wants a pointer and sample count. */
-        memcpy(image_data+stride*(cinfo.output_scanline-1), buffer[0], row_stride);
+        memcpy(image.data.data() + image.stride*(cinfo.output_scanline-1), buffer[0], row_stride);
     }
 
   /* Step 7: Finish decompression */
@@ -251,31 +256,7 @@ int read_JPEG_file (const char * filename) {
    */
 
   /* And we're done! */
-  return 1;
+  return image;
 }
 
-////////////////////////////////////////////////////////////////////////////
-
-uint8_t* load_png(const char *file_name)
-{
-        fs::path p = fs::current_path() / "graphics/" / file_name;
-        read_png_file(p.c_str());
-        return image_data;
-}
-
-////////////////////////////////////////////////////////////////////////////
-
-image load_jpeg(const char *file_name)
-{
-        fs::path p = fs::current_path() / "graphics/" / file_name;
-        read_JPEG_file(p.c_str());
-
-        image i;
-        i.data = image_data;
-        i.height = height;
-        i.width = width;
-        i.stride = stride;
-        return i;
-}
-
-////////////////////////////////////////////////////////////////////////////
+//-------------------------------------------------------------------------------------------

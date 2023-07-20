@@ -1,13 +1,14 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include <vector>
-
 #include "math_3d.h"
-#include "image_loader.h"
+#include "ImageLoader.h"
 #include "text_engine.h"
 
 #include "ogmain.h"
+
+#include <vector>
+#include <iostream>
 
 //-------------------------------------------------------------------------------------------
 
@@ -22,7 +23,7 @@ static GLuint texture_obj;
 std::vector<float> letter_boxes;
 
 
-static void find_boundaries_row(uint8_t *bits, int w, int top, int bottom)
+static void find_boundaries_row(const uint8_t *bits, int w, int top, int bottom)
 {
         int state = 0;  // 0-looking for start, 1-in letter
         int start = 0;
@@ -73,7 +74,7 @@ static void find_boundaries_row(uint8_t *bits, int w, int top, int bottom)
         }
 }
 
-static void find_boundaries_24(uint8_t *bits, int w)
+static void find_boundaries_24(const uint8_t *bits, int w)
 {
         for (int y=0; y<220; y+=29) {
                 find_boundaries_row(bits, w, y, y+29);
@@ -93,40 +94,7 @@ static void find_boundaries_24(uint8_t *bits, int w)
         }
 }
 
-
-// static float render_imaged_char(unsigned int which_char, float scale, float spacing, float x, float y)
-// {
-//         if (which_char == ' ') {
-//                 spacing += 6/29.0;
-//                 return spacing;
-//         }
-
-//         int index = char_to_index[which_char];
-//         if (index < 0) return spacing;  // unknown char requested
-
-//         float ratio = (letter_boxes[8*index+2] - letter_boxes[8*index]) / (29/256.0);
-
-//         Matrix4f mat;
-//         mat *= translation_matrix(x, y, 0);
-//         mat *= scale_matrix(window_ratio,1,1);
-//         mat *= scale_matrix(scale);
-//         mat *= translation_matrix(spacing, 0, 0);
-//         mat *= scale_matrix(ratio, 1, 1);
-//         glUniformMatrix4fv(text_shader->world_location, 1, GL_FALSE, mat.glformat());
-
-//         spacing += (ratio + 1/29.0);
-
-//         // set the sample coords
-//         glNamedBufferSubData(texture_coord_vbo, 0, sizeof(GLfloat)*8, letter_boxes.data()+(8*index));
-
-//         // glEnable(GL_BLEND);
-//         // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
-//         glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, 0);
-//         // glDisable(GL_BLEND);
-
-//         return spacing;
-// }
-
+//-------------------------------------------------------------------------------------------
 
 static float render_imaged_char(unsigned int which_char, int pixels, float spacing, float x, float y)
 {
@@ -162,7 +130,6 @@ static float render_imaged_char(unsigned int which_char, int pixels, float spaci
 }
 
 
-//ek need to return the bounding box of the rendered text
 float render_text(const std::string str, int pixels, float x, float y, TEXT_OFFSET which)
 {
         if (which == PIXEL_OFFSET) {
@@ -196,44 +163,20 @@ float render_text(const std::string str, int pixels, float x, float y, TEXT_OFFS
         return spacing * width_unit_per_pixel + x;
 }
 
-// //ek need to return the bounding box of the rendered text
-// void render_text(const std::string str, float scale, float x, float y)
-// {
-//         glBindVertexArray(square_vao);
-//         text_shader->use(0);
-//         glActiveTexture(GL_TEXTURE0);
-//         glBindTexture(GL_TEXTURE_2D, texture_obj);
-
-//         text_shader->set_fg_color(0, 0, 0);
-
-//         glEnable(GL_BLEND);
-//         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
-
-//         float spacing = 0;
-//         // char time_str[256]={"abcdefghijklmnopqrstuvwxyz?"};
-//         // // get_time(time_str);
-//         int i = 0;
-//         while (str[i] != 0) {
-//                 spacing = render_imaged_char((unsigned int)str[i], scale, spacing, x, y);
-//                 ++i;
-//         }
-//         glDisable(GL_BLEND);
-//         glBindVertexArray(0);
-// }
+//-------------------------------------------------------------------------------------------
 
 
 void load_text_engine()
 {
-        uint8_t *font_bits = load_png("text24.png");
-        find_boundaries_24(font_bits, 256);
+        Image font_bits = load_png("graphics/text24.png");
+        find_boundaries_24(font_bits.data.data(), 256);
         const GLsizei texture_width = 256;
-        const GLsizei texture_height = 256;
+        const GLsizei texture_height = font_bits.stride / 4;
         glGenTextures(1, &texture_obj);
         glBindTexture(GL_TEXTURE_2D, texture_obj);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, font_bits);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, font_bits.data.data());
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);       //GL_NEAREST
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);       //GL_NEAREST
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        free(font_bits);
 }

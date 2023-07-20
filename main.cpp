@@ -12,7 +12,7 @@
 #include "math_3d.h"
 #include "shader.h"
 #include "text_engine.h"
-#include "image_loader.h"
+#include "ImageLoader.h"
 
 #include "data.h"
 #include "fixed_model.h"

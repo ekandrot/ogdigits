@@ -11,7 +11,7 @@ target_sources(ogdigits.app
         PRIVATE fixed_model.cpp
         PRIVATE ogmain.cpp
         PRIVATE shader.cpp
-        PRIVATE image_loader.cpp
+        PRIVATE ImageLoader.cpp
         PRIVATE text_engine.cpp)
 
 cmake_policy (SET CMP0072 OLD)

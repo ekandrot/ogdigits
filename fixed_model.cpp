@@ -193,11 +193,14 @@ void learn_thread(const TrainingData *data, int first, int last, UpdateData &upd
                 int t[10] = {0};
                 t[data->Y[r]] = 1;
 
-                for (int j=0; j<25; ++j) {
-                        for (int i=0; i<25; ++i) {
-                                for (int k=0; k<10; ++k) {
-                                        update.W2[i + j*25] += (t[k] - output[k]) * update.W3[j + k*25] * (1 - hidden2[j]*hidden2[j]) * hidden1[i] * learn_rate * 0.1;
+                for (int k=0; k<10; ++k) {
+                        float t_output = (t[k] - output[k]);
+                        for (int j=0; j<25; ++j) {
+                                float dtanh2 = (1 - hidden2[j]*hidden2[j]) * update.W3[j + k*25];
+                                for (int i=0; i<25; ++i) {
+                                        update.W2[i + j*25] += t_output * dtanh2 * hidden1[i] * learn_rate * 0.1;
                                 }
+                                update.b2[j] += t_output * dtanh2 * learn_rate * 0.1;
                         }
                 }
 
@@ -253,7 +256,6 @@ void FixedModel::learn(const TrainingData *data)
                 pool[i].join();
         }
 
-
         // update the main data from what we've learned
         {
                 std::lock_guard<std::mutex> lck(mtx);
@@ -286,85 +288,7 @@ void FixedModel::learn(const TrainingData *data)
 
         }
 
-
-#if 0
-        // since we only lock around the model object's data read/write, we need a function lock above
-        std::unique_lock<std::mutex> lock(mtx);
-
-        // make local copies so that others can acquire the lock on the main model data
-        std::vector<float> W1(layer1);
-        std::vector<float> W2(layer2);
-        std::vector<float> W3(layer_out);
-
-        std::vector<float> b_hidden1_local(b_hidden1);
-        std::vector<float> b_hidden2_local(b_hidden2);
-        std::vector<float> b_output_local(b_output);
-
-        lock.unlock();
-
-
-        auto start_time = now();
-
-        const int num_features = data->num_features;
-        const int num_examples = data->num_examples;
-
-        const float learn_rate = 1.0/num_examples;
-
-        for (int r=0; r<num_examples; ++r) {
-                const float *example = data->row(r);
-                float hidden1[25];
-                float z1[25];
-                matmul(example, z1, W1.data(), num_features, 25);
-                vect_add(z1, b_hidden1_local);
-                activation(hidden1, z1, 25);
-
-                float hidden2[25];
-                float z2[25];
-                matmul(hidden1, z2, W2.data(), 25, 25);
-                vect_add(z2, b_hidden2_local);
-                activation(hidden2, z2, 25);
-
-                float output[10];
-                matmul(hidden2, output, W3.data(), 25, 10);
-                vect_add(output, b_output_local);
-                softmax(output, 10);
-
-
-                int t[10] = {0};
-                t[data->Y[r]] = 1;
-
-                for (int j=0; j<25; ++j) {
-                        for (int i=0; i<25; ++i) {
-                                for (int k=0; k<10; ++k) {
-                                        W2[i + j*25] += (t[k] - output[k]) * W3[j + k*25] * (1 - hidden2[j]*hidden2[j]) * hidden1[i] * learn_rate * 0.1;
-                                }
-                        }
-                }
-
-                for (int j=0; j<10; ++j) {
-                        for (int i=0; i<25; ++i) {
-                                W3[i + j*25] += (t[j] - output[j]) * hidden2[i] * learn_rate;
-                        }
-                        b_output_local[j] += (t[j] - output[j]) * learn_rate;
-                }
-        }
-
-
-#endif
         ++epoch;
-
-        // // update the main data from what we've learned
-        // {
-        //         std::lock_guard<std::mutex> lck(mtx);
-
-        //         layer1 = W1;
-        //         layer2 = W2;
-        //         layer_out = W3;
-
-        //         b_hidden1 = b_hidden1_local;
-        //         b_hidden2 = b_hidden2_local;
-        //         b_output = b_output_local;
-        // }
 
         auto end_time = now();
         last_training_time_ms = duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
