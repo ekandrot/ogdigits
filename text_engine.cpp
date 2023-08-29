@@ -1,13 +1,14 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include <vector>
-
 #include "math_3d.h"
-#include "image_loader.h"
+#include "ImageLoader.h"
 #include "text_engine.h"
 
 #include "ogmain.h"
+
+#include <vector>
+#include <iostream>
 
 //-------------------------------------------------------------------------------------------
 
@@ -167,16 +168,15 @@ float render_text(const std::string str, int pixels, float x, float y, TEXT_OFFS
 
 void load_text_engine()
 {
-        uint8_t *font_bits = load_png("text24.png");
-        find_boundaries_24(font_bits, 256);
+        Image font_bits = load_png("graphics/text24.png");
+        find_boundaries_24(font_bits.data.data(), 256);
         const GLsizei texture_width = 256;
-        const GLsizei texture_height = 256;
+        const GLsizei texture_height = font_bits.stride / 4;
         glGenTextures(1, &texture_obj);
         glBindTexture(GL_TEXTURE_2D, texture_obj);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, font_bits);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texture_width, texture_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, font_bits.data.data());
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);       //GL_NEAREST
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);       //GL_NEAREST
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        free(font_bits);
 }
